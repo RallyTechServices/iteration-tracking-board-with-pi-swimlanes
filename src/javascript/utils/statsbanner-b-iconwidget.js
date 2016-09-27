@@ -20,6 +20,9 @@ Ext.define('CArABU.technicalservices.IconWidget', {
         '</div>',  //stat-metric
         '</div>',  //expanded-widget
         '<div class="collapsed-widget">',
+        '<div class="metric-icon ',
+        '{statIcon}',
+        '"></div>',
         '<div class="stat-title">{title}</div>',
         '<div class="stat-metric">{statUnits}</div>',
         '</div>'

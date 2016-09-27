@@ -1,0 +1,19 @@
+{
+    "name": "Iteration Tracking Board with PI Swimlanes",
+    "sdk": "2.1",
+    "className": "iteration-tracking-board-with-pi-swimlanes",
+    "javascript": [
+        "./utils/__ts-info-link.js",
+        "./utils/__ts-logger.js",
+        "./utils/overrides.js",
+        "./utils/override-cardboard.js",
+        "./utils/statsbanner-widget.js",
+        "./utils/statsbanner-gauge.js",
+        "./utils/statsbanner.js",
+        "app.js"
+    ],
+    "css": [
+        "../style/app.css",
+        "../style/statsbanner.css"
+    ]
+}

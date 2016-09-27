@@ -23,7 +23,7 @@ Ext.define('CArABU.technicalservices.ConfigurableGauge', {
         '</div>',
         '<div class="collapsed-widget">',
         '<div class="stat-title">{title}</div>',
-        '<div class="stat-metric">{percentage}<span class="metric-percent">{percentUnit}</span></div>',
+        '<div class="stat-metric"><tpl if="displayPercentage &gt;= 0">{displayPercentage}<tpl else>{percentage}</tpl><span class="metric-percent">{percentUnit}</span></div>',
         '</div>'
     ],
 

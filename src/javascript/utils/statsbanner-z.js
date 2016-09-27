@@ -17,7 +17,6 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
     config: {
         context: null,
         expanded: true
-
     },
 
     items: [
@@ -50,6 +49,9 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
             statIcon: 'icon-task',
             unitLabel: 'active',
             flex: 2
+        },{
+            xtype: 'statsbannercollapseexpand',
+            flex: 0
         }
     ],
 

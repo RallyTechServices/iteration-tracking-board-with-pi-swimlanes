@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Sep 27 2016 07:15:06 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Sep 27 2016 08:28:33 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Sep 27 2016 07:15:06 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Sep 27 2016 08:28:33 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 93038883004;
+        var CHECKSUM = 97351020295;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -619,7 +619,7 @@ Ext.define('CArABU.technicalservices.ConfigurableGauge', {
         '</div>',
         '<div class="collapsed-widget">',
         '<div class="stat-title">{title}</div>',
-        '<div class="stat-metric">{percentage}<span class="metric-percent">{percentUnit}</span></div>',
+        '<div class="stat-metric"><tpl if="displayPercentage &gt;= 0">{displayPercentage}<tpl else>{percentage}</tpl><span class="metric-percent">{percentUnit}</span></div>',
         '</div>'
     ],
 
@@ -869,6 +869,9 @@ Ext.define('CArABU.technicalservices.IconWidget', {
         '</div>',  //stat-metric
         '</div>',  //expanded-widget
         '<div class="collapsed-widget">',
+        '<div class="metric-icon ',
+        '{statIcon}',
+        '"></div>',
         '<div class="stat-title">{title}</div>',
         '<div class="stat-metric">{statUnits}</div>',
         '</div>'
@@ -947,6 +950,52 @@ Ext.define('CArABU.technicalservices.Accepted', {
 
     }
 });
+
+    /**
+     * shows collapse/expand toggle for stats banner
+     */
+    Ext.define('CArABU.technicalservices.CollapseExpand', {
+        extend: 'CArABU.technicalservices.BannerWidget',
+        alias:'widget.statsbannercollapseexpand',
+        requires: [],
+
+        tpl: [
+            '<div class="expanded-widget">',
+            '<div class="toggle-icon icon-collapse-row"></div>',
+            '</div>',
+            '<div class="collapsed-widget">',
+            '<div class="toggle-icon icon-expand-row"></div>',
+            '</div>'
+        ],
+
+        componentCls: 'collapse-expand',
+
+        bubbleEvents: ['collapse', 'expand'],
+
+        afterRender: function() {
+            this.callParent(arguments);
+            this.getEl().on('click', this._onCollapseExpandClick, this);
+            this.fireEvent('ready', this);
+        },
+
+        _onCollapseExpandClick: function() {
+            if (this.expanded) {
+                this.fireEvent('collapse', this);
+            } else {
+                this.fireEvent('expand', this);
+            }
+        },
+
+        expand: function() {
+            this.callParent(arguments);
+            this.doComponentLayout();
+        },
+
+        collapse: function() {
+            this.callParent(arguments);
+            this.doComponentLayout();
+        }
+    });
 
 Ext.define('CArABU.technicalservices.Defects', {
     extend: 'CArABU.technicalservices.IconWidget',
@@ -1192,7 +1241,6 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
     config: {
         context: null,
         expanded: true
-
     },
 
     items: [
@@ -1225,6 +1273,9 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
             statIcon: 'icon-task',
             unitLabel: 'active',
             flex: 2
+        },{
+            xtype: 'statsbannercollapseexpand',
+            flex: 0
         }
     ],
 

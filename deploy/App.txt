@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Sep 26 2016 21:34:16 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Sep 27 2016 07:15:06 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Sep 26 2016 21:34:16 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Sep 27 2016 07:15:06 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 89869263200;
+        var CHECKSUM = 93038883004;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -611,7 +611,7 @@ Ext.define('CArABU.technicalservices.ConfigurableGauge', {
         '<div class="stat-metric">',
         '<div class="metric-chart"></div>',
         '<div class="metric-chart-text percent-offset">',
-        '{percentage}',
+        '<tpl if="displayPercentage &gt;= 0">{displayPercentage}<tpl else>{percentage}</tpl>',
         '<div class="metric-percent">{percentUnit}</div>',
         '</div>',
         '<div class="metric-subtext">{calculatedUnits} of {totalUnits} {unit}<tpl if="secondaryUnit">, {secondaryCalculatedUnits} of {secondaryTotalUnits} {secondaryUnit}</tpl></div>',
@@ -845,28 +845,6 @@ Ext.define('CArABU.technicalservices.ConfigurableGauge', {
                 color: "#FFFFFF"
             }
         };
-    },
-
-    _getTZOffset: function() {
-        var projectRef = Rally.util.Ref.getRelativeUri(this.getContext().getProject());
-        if (!Ext.isDefined(this._tzOffsetPromises[projectRef])) {
-            var deferred = this._tzOffsetPromises[projectRef] = Ext.create('Deft.Deferred');
-            Rally.environment.getIoProvider().httpGet({
-                url: Rally.environment.getServer().getWsapiUrl() + '/iteration',
-                params: {
-                    includeSchema: true,
-                    pagesize:1,
-                    fetch: false,
-                    project: projectRef
-                },
-                success: function(results) {
-                    deferred.resolve((results.Schema.properties.EndDate.format.tzOffset || 0) / 60);
-                },
-                requester: this,
-                scope: this
-            });
-        }
-        return this._tzOffsetPromises[projectRef];
     }
 });
 Ext.define('CArABU.technicalservices.IconWidget', {
@@ -1012,13 +990,19 @@ Ext.define('CArABU.technicalservices.IterationEnd', {
         var today = new Date(),
             startDate = this.timeboxRecord.get('StartDate'),
             endDate = this.timeboxRecord.get('EndDate'),
-            totalDays = this.getWeekdaysBetween(endDate, startDate),
-            daysLeft = this.getWeekdaysBetween(endDate, today);
+            totalDays = this.daysBetween(startDate, endDate, true),
+            daysLeft = this.daysBetween(today, endDate, true);
+
+        if (today > endDate){
+            daysLeft = 0;
+        }
+
+        var pct = totalDays > 0 ? (totalDays - daysLeft)/totalDays * 100 : 0;
 
         var data = {
-            percentage: daysLeft,
+            displayPercentage: daysLeft,
+            percentage: pct,
             percentUnit: '',
-            chartPercentage: totalDays > 0 ? daysLeft/totalDays * 100 : 0,
             calculatedUnits: 'days left',
             totalUnits: totalDays,
             unit: this.unit || '',
@@ -1028,9 +1012,99 @@ Ext.define('CArABU.technicalservices.IterationEnd', {
         return data;
 
     },
-    getWeekdaysBetween: function(endDate, startDate){
-        return Rally.util.DateTime.getDifference(endDate, startDate, 'day');
+    daysBetween: function(startDate,endDate,skip_weekends){
+
+        var date1 = Ext.clone(startDate),
+            date2 = Ext.clone(endDate);
+
+        if ( typeof(date1) == "string" ) {
+            date1 = Rally.util.DateTime.fromIsoString(date1);
+        }
+        if ( typeof(date2) == "string" ) {
+            date2 = Rally.util.DateTime.fromIsoString(date2);
+        }
+
+        if ( date1 == date2 ) { return 0; }
+        if (typeof date1 === "number") { date1 = new Date(startDate); }
+        if (typeof date2 === "number") { date2 = new Date(date2); }
+
+        if ( !skip_weekends ) {
+            return Math.abs( Rally.util.DateTime.getDifference(date1,date2,'day') );
+        } else {
+
+            if (date2 < date1){
+                var x = date2;
+                date2 = date1;
+                date1 = x;
+            }
+
+            // shift to the following Monday
+            if (!this.isWeekday(date1)) {
+                date1 = this.shiftDateToNextWeekday(date1);
+            }
+            if (!this.isWeekday(date2)) {
+                date2 = this.shiftDateToLastWeekday(date2);
+            }
+
+            // calculate differnece in weeks (1000mS * 60sec * 60min * 24hrs * 7 days = 604800000)
+            var iDays = Math.round((date2.getTime() - date1.getTime())/ 86400000),
+                iWeeks = Math.floor(iDays/7),
+                iLeftoverDays = iDays % 7;
+
+            return iWeeks  * 5 + iLeftoverDays;
+        }
+    },
+
+    isWeekday: function(check_date) {
+        var weekday = true;
+        var day = check_date.getDay();
+
+        if ( day === 0 || day === 6 ) {
+            weekday = false;
+        }
+        return weekday;
+    },
+    shiftDateToNextWeekday: function(check_date) {
+        var day = check_date.getDay();
+
+        var delta = 0;
+
+        if ( day === 0 ) {
+            // it's Sunday
+            delta = 1;
+        }
+        if ( day === 6 ) {
+            delta = 2;
+        }
+
+        var shifted_date = check_date;
+        if ( delta > 0 ) {
+            shifted_date = new Date(check_date.setHours(0));
+            shifted_date = Rally.util.DateTime.add(shifted_date,"day",delta);
+        }
+        return shifted_date;
+    },
+    shiftDateToLastWeekday: function(check_date) {
+        var day = check_date.getDay();
+
+        var delta = 0;
+
+        if ( day === 0 ) {
+            // it's Sunday
+            delta = -2;
+        }
+        if ( day === 6 ) {
+            delta = -1;
+        }
+
+        var shifted_date = check_date;
+        if ( delta != 0 ) {
+            //shifted_date = new Date(check_date.setHours(0));
+            shifted_date = Rally.util.DateTime.add(check_date,"day",delta);
+        }
+        return shifted_date;
     }
+
 });
 
 Ext.define('CArABU.technicalservices.PlannedVelocity', {
@@ -1049,7 +1123,7 @@ Ext.define('CArABU.technicalservices.PlannedVelocity', {
     _getRenderData: function() {
 
         var total = 0,
-            plannedVelocity = this.timeboxRecord.get('PlannedVelocity'),
+            plannedVelocity = this.timeboxRecord.get('PlannedVelocity') || 0,
             name = this.timeboxRecord.get('Name');
 
         Ext.Array.each(this.store.getRange(), function(r) {
@@ -1113,11 +1187,11 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
     stateful: true,
     stateEvents: ['expand', 'collapse'],
     filters: [],
-    firstPortfolioItemName: 'Feature',
+
 
     config: {
         context: null,
-        expanded: true,
+        expanded: true
 
     },
 
@@ -1178,7 +1252,6 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
         this.subscribe(this, Rally.Message.bulkUpdate, this._update, this);
 
         this._createWorkItemStore(this.customFilters);
-      //  this._createTestCaseStore();
 
         this.items = this._configureItems(this.items);
 
@@ -1189,28 +1262,6 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
         this._update();
 
     },
-    //_checkForLateStories: function(store){
-    //    var lateStories = [],
-    //        targetDate = Rally.util.DateTime.fromIsoString(this.timeboxRecord.get(this.timeboxEndDateField));
-    //
-    //    _.each(this.store.getRange(), function(record){
-    //        var iteration = record.get('Iteration'),
-    //            children = record.get('DirectChildrenCount') || 0;
-    //        if (children === 0){
-    //            if (iteration){
-    //                if (Rally.util.DateTime.fromIsoString(iteration.EndDate) > targetDate){
-    //                    lateStories.push(record);
-    //                }
-    //            } else {
-    //                lateStories.push(record);
-    //            }
-    //        }
-    //
-    //    }, this);
-    //    if (lateStories.length > 0){
-    //        this.fireEvent('latestoriesfound', lateStories);
-    //    }
-    //},
     onRender: function() {
         if (this.expanded) {
             this.removeCls('collapsed');
@@ -1333,31 +1384,8 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
             var customFilter = Rally.data.wsapi.Filter.fromQueryString(customFilters.filters.toString());
             filters = filters.and(customFilter);
         }
-
-        console.log('filters', filters.toString());
         return filters;
     },
-    //_createTestCaseResultStore: function(){
-    //
-    //    var filters =  Rally.data.wsapi.Filter.or([{
-    //        property: 'TestCase.Milestones.ObjectID',
-    //        //     operator: 'contains',
-    //        value:  this.timeboxRecord.get('ObjectID')
-    //    },{
-    //        property: 'TestCase.WorkProduct.Milestones.ObjectID',
-    //        //     operator: 'contains',
-    //        value:  this.timeboxRecord.get('ObjectID')
-    //    }]);
-    //
-    //    this.testCaseResultStore = Ext.create('Rally.data.wsapi.Store',{
-    //        model: 'TestCaseResult',
-    //        filters: filters,
-    //        fetch: ['ObjectID', 'TestCase','WorkProduct','FormattedID','Attachments'],
-    //        context: this.context.getDataContext(),
-    //        pageSize: 1000,
-    //        limit: 'Infinity'
-    //    });
-    //},
 
     _createWorkItemStore: function(customFilters){
         var filters = this._getWorkItemFilters(customFilters);
@@ -1400,25 +1428,67 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         }
     },
     settingsScope: 'project',
-    validPortfolioItems: [{
-        TypePath: 'PortfolioItem/Feature',
-        DisplayName: 'Feature'
-    },{
-        TypePath: 'PortfolioItem/Initiative',
-        DisplayName: 'Initiative'
-
-    }],
+    validPortfolioItems: null,
                         
     launch: function() {
         if (!this.isTimeboxScoped()){
             this.showNoScopeMessage();
             return;
         }
-        this.initializeData().then({
-            success: this.onTimeboxScopeChange,
+
+        this.fetchPortfolioItemTypes().then({
+            success: function(types){
+                this.validPortfolioItems = types;
+                this.logger.log('validPortfolioItems', this.validPortfolioItems);
+                this.initializeData().then({
+                    success: this.onTimeboxScopeChange,
+                    failure: this.showErrorNotification,
+                    scope: this
+                });
+            },
             failure: this.showErrorNotification,
             scope: this
         });
+
+    },
+    fetchPortfolioItemTypes: function(){
+        var deferred = Ext.create('Deft.Deferred');
+
+        Ext.create('Rally.data.wsapi.Store', {
+            model: 'TypeDefinition',
+            fetch: ['TypePath', 'Ordinal','Name'],
+            filters: [
+                {
+                    property: 'Parent.Name',
+                    operator: '=',
+                    value: 'Portfolio Item'
+                },
+                {
+                    property: 'Creatable',
+                    operator: '=',
+                    value: 'true'
+                }
+            ],
+            sorters: [{
+                property: 'Ordinal',
+                direction: 'ASC'
+            }]
+        }).load({
+            callback: function(records, operation, success){
+                if (success){
+                    var types = Ext.Array.map(records, function(r){ return {TypePath: r.get('TypePath'), DisplayName: r.get('Name')}; });
+                    deferred.resolve(types);
+                } else {
+                    var error_msg = '';
+                    if (operation && operation.error && operation.error.errors){
+                        error_msg = operation.error.errors.join(',');
+                    }
+                    deferred.reject('Error loading Portfolio Item Types:  ' + error_msg);
+                }
+            }
+        });
+
+        return deferred;
     },
 
     showErrorNotification: function(msg){
@@ -1518,6 +1588,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
 
         this.getBannerBox().add({
             xtype: 'statsbanner',
+            margin: '0 0 5px 0',
             context: this.getContext(),
             timeboxRecord: this.getContext().getTimeboxScope().getRecord()
         });
@@ -1529,7 +1600,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         return this.getSetting('showAgeForCard') === true || this.getSetting('showAgeForCard') === 'true' || false;
     },
     getShowAgeAfterDays: function(){
-        return this.getShowAge() && this.getSetting('showAgeAfterDays') || 3;
+        return this.getShowAge() && (this.getSetting('showAgeAfterDays') || 3) || -1;
     },
     showNoScopeMessage: function(){
         this.add({
@@ -1578,14 +1649,18 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                     fetch: ['Feature','Parent','ObjectID'],
                     compact: false
                 },
-                validPortfolioItems: this.getValidPortfolioItemFields()
+                cardConfig: {
+                    showAge: this.getShowAgeAfterDays(),
+                    ageFieldName: 'ScheduleState'
+                }
+
             };
 
         if (this.getSwimlane()){
-           var values = undefined;
+            var values = undefined;
             if (this.getPortfolioSwimlaneIndex() > 0){
                 values = Ext.Object.getValues(this.portfolioItemHash);
-            }
+            };
 
             boardConfig.rowConfig = {
                 field: this.getSwimlane(),
@@ -1593,7 +1668,8 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                 values: values,
                 enableCrossRowDragging: false,
                 validPortfolioItems: this.getValidPortfolioItemFields()
-            }
+            };
+            boardConfig.validPortfolioItems = this.getValidPortfolioItemFields();
         }
 
         return boardConfig;

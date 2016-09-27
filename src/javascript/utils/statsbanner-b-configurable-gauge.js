@@ -15,7 +15,7 @@ Ext.define('CArABU.technicalservices.ConfigurableGauge', {
         '<div class="stat-metric">',
         '<div class="metric-chart"></div>',
         '<div class="metric-chart-text percent-offset">',
-        '{percentage}',
+        '<tpl if="displayPercentage &gt;= 0">{displayPercentage}<tpl else>{percentage}</tpl>',
         '<div class="metric-percent">{percentUnit}</div>',
         '</div>',
         '<div class="metric-subtext">{calculatedUnits} of {totalUnits} {unit}<tpl if="secondaryUnit">, {secondaryCalculatedUnits} of {secondaryTotalUnits} {secondaryUnit}</tpl></div>',
@@ -249,27 +249,5 @@ Ext.define('CArABU.technicalservices.ConfigurableGauge', {
                 color: "#FFFFFF"
             }
         };
-    },
-
-    _getTZOffset: function() {
-        var projectRef = Rally.util.Ref.getRelativeUri(this.getContext().getProject());
-        if (!Ext.isDefined(this._tzOffsetPromises[projectRef])) {
-            var deferred = this._tzOffsetPromises[projectRef] = Ext.create('Deft.Deferred');
-            Rally.environment.getIoProvider().httpGet({
-                url: Rally.environment.getServer().getWsapiUrl() + '/iteration',
-                params: {
-                    includeSchema: true,
-                    pagesize:1,
-                    fetch: false,
-                    project: projectRef
-                },
-                success: function(results) {
-                    deferred.resolve((results.Schema.properties.EndDate.format.tzOffset || 0) / 60);
-                },
-                requester: this,
-                scope: this
-            });
-        }
-        return this._tzOffsetPromises[projectRef];
     }
 });

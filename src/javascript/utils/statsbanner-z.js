@@ -12,11 +12,11 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
     stateful: true,
     stateEvents: ['expand', 'collapse'],
     filters: [],
-    firstPortfolioItemName: 'Feature',
+
 
     config: {
         context: null,
-        expanded: true,
+        expanded: true
 
     },
 
@@ -77,7 +77,6 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
         this.subscribe(this, Rally.Message.bulkUpdate, this._update, this);
 
         this._createWorkItemStore(this.customFilters);
-      //  this._createTestCaseStore();
 
         this.items = this._configureItems(this.items);
 
@@ -88,28 +87,6 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
         this._update();
 
     },
-    //_checkForLateStories: function(store){
-    //    var lateStories = [],
-    //        targetDate = Rally.util.DateTime.fromIsoString(this.timeboxRecord.get(this.timeboxEndDateField));
-    //
-    //    _.each(this.store.getRange(), function(record){
-    //        var iteration = record.get('Iteration'),
-    //            children = record.get('DirectChildrenCount') || 0;
-    //        if (children === 0){
-    //            if (iteration){
-    //                if (Rally.util.DateTime.fromIsoString(iteration.EndDate) > targetDate){
-    //                    lateStories.push(record);
-    //                }
-    //            } else {
-    //                lateStories.push(record);
-    //            }
-    //        }
-    //
-    //    }, this);
-    //    if (lateStories.length > 0){
-    //        this.fireEvent('latestoriesfound', lateStories);
-    //    }
-    //},
     onRender: function() {
         if (this.expanded) {
             this.removeCls('collapsed');
@@ -232,31 +209,8 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
             var customFilter = Rally.data.wsapi.Filter.fromQueryString(customFilters.filters.toString());
             filters = filters.and(customFilter);
         }
-
-        console.log('filters', filters.toString());
         return filters;
     },
-    //_createTestCaseResultStore: function(){
-    //
-    //    var filters =  Rally.data.wsapi.Filter.or([{
-    //        property: 'TestCase.Milestones.ObjectID',
-    //        //     operator: 'contains',
-    //        value:  this.timeboxRecord.get('ObjectID')
-    //    },{
-    //        property: 'TestCase.WorkProduct.Milestones.ObjectID',
-    //        //     operator: 'contains',
-    //        value:  this.timeboxRecord.get('ObjectID')
-    //    }]);
-    //
-    //    this.testCaseResultStore = Ext.create('Rally.data.wsapi.Store',{
-    //        model: 'TestCaseResult',
-    //        filters: filters,
-    //        fetch: ['ObjectID', 'TestCase','WorkProduct','FormattedID','Attachments'],
-    //        context: this.context.getDataContext(),
-    //        pageSize: 1000,
-    //        limit: 'Infinity'
-    //    });
-    //},
 
     _createWorkItemStore: function(customFilters){
         var filters = this._getWorkItemFilters(customFilters);

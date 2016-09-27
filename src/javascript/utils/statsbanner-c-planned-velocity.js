@@ -14,7 +14,7 @@ Ext.define('CArABU.technicalservices.PlannedVelocity', {
     _getRenderData: function() {
 
         var total = 0,
-            plannedVelocity = this.timeboxRecord.get('PlannedVelocity'),
+            plannedVelocity = this.timeboxRecord.get('PlannedVelocity') || 0,
             name = this.timeboxRecord.get('Name');
 
         Ext.Array.each(this.store.getRange(), function(r) {

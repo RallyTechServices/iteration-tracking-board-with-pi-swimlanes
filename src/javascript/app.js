@@ -222,7 +222,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             models: this.getModelNames(),
             enableHierarchy: true,
             filters: this.getIterationFilter(),
-            fetch: ['Feature','Parent','ObjectID']
+            //fetch: ['Feature','Parent','ObjectID']
         }).then({
             success: this.buildBoard,
             scope: this
@@ -280,7 +280,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             iterationFilters = this.getIterationFilter();
         this.logger.log('buildBoard iterationFilters', iterationFilters.toString());
 
-        store.load();
+        //store.load();
         this.getGridBox().add({
             xtype: 'rallygridboard',
             context: context,

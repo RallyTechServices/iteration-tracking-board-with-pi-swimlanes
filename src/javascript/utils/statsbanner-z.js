@@ -43,12 +43,15 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
             unitLabel: 'active',
             statIcon: 'icon-defect',
             flex: 2
-        },{
+        }, {
             xtype: 'statsbannertasks',
             title: 'Tasks',
             statIcon: 'icon-task',
             unitLabel: 'active',
             flex: 2
+        },{
+            xtype: 'statsbanneriterationprogress',
+            flex: 4
         },{
             xtype: 'statsbannercollapseexpand',
             flex: 0
@@ -191,19 +194,7 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
             property: 'Iteration.EndDate',
             value: this.timeboxRecord.get('EndDate')
         }];
-        var workItemFilters = Rally.data.wsapi.Filter.and(filters),
-            defectFilters = Rally.data.wsapi.Filter.and([{
-                property: 'Requirement.Iteration.Name',
-                value: this.timeboxRecord.get('Name')
-            },{
-                property: 'Requirement.Iteration.StartDate',
-                value: this.timeboxRecord.get('StartDate')
-            },{
-                property: 'Requirement.Iteration.EndDate',
-                value: this.timeboxRecord.get('EndDate')
-            }]);
-
-        filters = workItemFilters.or(defectFilters);
+        filters = Rally.data.wsapi.Filter.and(filters);
 
         if (customFilters && customFilters.filters && customFilters.filters.length > 0  && customFilters.types &&
             (Ext.Array.contains(customFilters.types, 'hierarchicalrequirement') || Ext.Array.contains(customFilters.types, 'defect'))
@@ -218,10 +209,27 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
         var filters = this._getWorkItemFilters(customFilters);
 
         this.store = Ext.create('Rally.data.wsapi.artifact.Store', {
-            models: ['HierarchicalRequirement','Defect','Task'],
-            fetch: ['ObjectID', 'FormattedID', 'ScheduleState','AcceptedDate','ClosedDate', 'PlanEstimate','Iteration','Name','StartDate','EndDate','State'],
+            models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
+            fetch: ['ObjectID',
+                'FormattedID',
+                'ScheduleState',
+                'AcceptedDate',
+                'ClosedDate',
+                'PlanEstimate',
+                'Iteration',
+                'Name',
+                'StartDate',
+                'EndDate',
+                'State',
+                'Defects:summary[State]',
+                'Tasks:summary[State;Blocked]',
+                'TestCases:summary'],
             filters: filters,
             pageSize: 1000,
+            sorters: [{
+                property: 'ScheduleState',
+                direction:'ASC'
+            }],
             context: this.context.getDataContext(),
             limit: 'Infinity'
         });

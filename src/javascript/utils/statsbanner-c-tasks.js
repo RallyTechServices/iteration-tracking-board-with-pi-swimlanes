@@ -6,9 +6,9 @@ Ext.define('CArABU.technicalservices.Tasks', {
         console.log('this',this.statIcon, this.unitLabel, this.title, this.statUnits);
         var activeTasks = 0;
         Ext.Array.each(this.store.getRange(), function(r) {
-            var type = r.get('_type');
-            if (type.toLowerCase() === 'task' && r.get('State') !== 'Completed'){
-                activeTasks++;
+            var summary = r.get('Summary');
+            if (summary.Tasks && summary.Tasks.State){
+                activeTasks += (summary.Tasks.State.Defined || 0 + summary.Tasks.State['In-Progress'] || 0);
             }
         });
 

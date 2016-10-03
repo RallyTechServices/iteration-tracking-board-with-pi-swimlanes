@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Sep 27 2016 08:28:33 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Oct 03 2016 17:37:15 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Sep 27 2016 08:28:33 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Oct 03 2016 17:37:15 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 97351020295;
+        var CHECKSUM = 282866107215;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -553,6 +553,593 @@ Ext.override(Rally.ui.cardboard.row.Row,{
 
     }
 });
+Ext.define('CArABU.technicalservices.CFDCalculator', {
+    extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
+    config: {
+        stateFieldName: 'ScheduleState',
+        stateFieldValues: ['Defined', 'In-Progress', 'Completed', 'Accepted']
+    },
+
+    constructor: function(config) {
+        this.initConfig(config);
+        this.callParent(arguments);
+    },
+    runCalculation: function (snapshots) {
+        var calculatorConfig = this._prepareCalculatorConfig(),
+            seriesConfig = this._buildSeriesConfig(calculatorConfig);
+
+        var calculator = this.prepareCalculator(calculatorConfig);
+        calculator.addSnapshots(snapshots, this._getStartDate(snapshots), this._getEndDate(snapshots));
+
+        return this._transformLumenizeDataToHighchartsSeries(calculator, seriesConfig);
+    },
+    getMetrics: function() {
+        return _.map(this.getStateFieldValues(), function(stateFieldValue) {
+            return  {
+                as: stateFieldValue,
+                groupByField: this.getStateFieldName(),
+                allowedValues: [stateFieldValue],
+                f: 'groupByCount',
+                display: 'area'
+            };
+        }, this);
+    }
+});
+Ext.define('CArABU.technicalservices.IterationProgressDialogChartToggle', {
+    requires:['Rally.ui.Button'],
+    extend:'Ext.Container',
+    alias:'widget.iterationprogressdialogcharttoggle',
+
+    componentCls: 'iteration-progress-toggle-button-group',
+    layout: 'hbox',
+    border: 1,
+    width: 106,
+    activeButtonCls: 'rly-active',
+
+    defaultType: 'rallybutton',
+
+    config: {
+        startingIndex: 0
+    },
+
+    items: [{
+        cls: 'toggle rly-left pie-chart',
+        iconCls: 'icon-pie',
+        frame: false,
+        toggleGroup: 'iterationprogressviewtoggle',
+        style: {
+            fontSize: '15px'
+        },
+        toolTipConfig: {
+            html: 'Pie',
+            anchor: 'top',
+            hideDelay: 0
+        },
+        userAction:'IterationProgressApp - User clicked pie chart'
+    },
+        {
+            cls: 'toggle center burndown',
+            iconCls: 'icon-bars',
+            frame: false,
+            toggleGroup: 'iterationprogressviewtoggle',
+            toolTipConfig: {
+                html: 'Burndown',
+                anchor: 'top',
+                hideDelay: 0
+            },
+            userAction:'IterationProgressApp - User clicked burndown'
+        },
+        {
+            cls: 'toggle rly-right cumulativeflow',
+            iconCls: 'icon-graph',
+            frame: false,
+            toggleGroup: 'iterationprogressviewtoggle',
+            toolTipConfig: {
+                html: 'Cumulative Flow',
+                anchor: 'top',
+                hideDelay: 0
+            },
+            userAction:'IterationProgressApp - User clicked CFD'
+        }],
+
+    initComponent: function(config) {
+        this.initConfig(config);
+        this.callParent(arguments);
+
+        this.addEvents([
+        /**
+         * @event toggle
+         * Fires when the toggle value is changed.
+         * @param {String} toggleState 'burndown' or 'cumulativeflow' or 'pie'.
+         */
+            'toggle'
+        ]);
+
+        this.items.each(function(item) {
+            item.on('click', this._onButtonClick, this);
+        }, this);
+
+        this.setCurrentItem(this.startingIndex);
+    },
+
+    _onButtonClick: function(btn) {
+        var btnIndex = this.items.indexOf(btn);
+        if (btnIndex !== this._activeIndex) {
+            this._setActive(btn);
+            this.fireEvent('toggle', this, btnIndex);
+        }
+    },
+
+    _setActive: function(btn) {
+        this.items.each(function(item, btnIndex) {
+            if (item === btn) {
+                if (!item.hasCls(this.activeButtonCls.split(' ')[0])) {
+                    item.addCls(this.activeButtonCls);
+                    this._activeIndex = btnIndex;
+                }
+            } else {
+                item.removeCls(this.activeButtonCls);
+            }
+        }, this);
+    },
+
+    setCurrentItem: function(itemIndex) {
+        this._setActive(this.items.get(itemIndex));
+    }
+});
+Ext.define("CArABU.technicalservices.PieChart", {
+    alias: "widget.statsbannerpiechart",
+    extend: "Ext.Container",
+
+    currentScope: undefined,
+    height: undefined,
+    width: undefined,
+    displayTitle: 'Pie',
+    config: {
+        context: null
+    },
+
+    initComponent: function() {
+        this.callParent(arguments);
+
+        if (this._storyStates === undefined) {
+            Rally.data.ModelFactory.getModels({
+                types: ['UserStory', 'Defect', 'DefectSuite', 'TestSet'],
+                context: this.getContext(),
+                scope: this,
+                requester: this,
+                success: this._createStateMap
+            });
+        } else {
+            this._loadArtifacts();
+        }
+    },
+
+    _createStateMap: function(models) {
+        var stateMap = ['Defined', 'In-Progress', 'Completed'],
+            stateMapIndex = 0,
+            storyStates = {};
+
+        _.each(models.UserStory.getField('ScheduleState').getAllowedStringValues(), function(state) {
+            if (state === stateMap[stateMapIndex + 1]) {
+                stateMapIndex++;
+            }
+            storyStates[state] = stateMap[stateMapIndex];
+        });
+
+        this._storyStates = storyStates;
+        this._loadArtifacts();
+    },
+
+    _loadArtifacts: function() {
+        this._chartData = [];
+        this._childChartData = [];
+
+        this.store = Ext.create('Rally.data.wsapi.artifact.Store', {
+            models: ['User Story', 'Defect', 'Defect Suite', 'Test Set'],
+            fetch: ['Defects', 'PlanEstimate', 'Requirement', 'FormattedID', 'Name', 'Blocked', 'BlockedReason', 'ScheduleState', 'State', 'Tasks', 'TestCases'],
+            filters: [this.context.getTimeboxScope().getQueryFilter()],
+            sorters: [
+                {property: 'ScheduleState'}
+            ],
+            context: this.context.getDataContext(),
+            limit: Infinity,
+            requester: this,
+            autoLoad: true,
+            listeners: {
+                load: this._loadChildCollections,
+                scope: this
+            }
+        });
+    },
+
+    _loadChildCollections: function() {
+        var records = this.store.getRange();
+        var promises = [];
+        _.each(records, function(record) {
+            if (record.get('Defects') && record.get('Defects').Count) {
+                promises.push(record.getCollection('Defects', {
+                    fetch: ['FormattedID', 'Name', 'ScheduleState', 'Blocked', 'BlockedReason', 'Requirement', 'State']
+                }).load({
+                    requester: this,
+                    callback: function(defects) {
+                        record.get('Defects').Results = defects;
+                    }
+                }));
+            }
+            if (record.get('Tasks') && record.get('Tasks').Count) {
+                promises.push(record.getCollection('Tasks', {
+                    fetch: ['FormattedID', 'Name', 'Blocked', 'BlockedReason', 'WorkProduct', 'State']
+                }).load(
+                    {
+                        requester: this,
+                        callback: function(tasks) {
+                            record.get('Tasks').Results = tasks;
+                        }
+                    }
+                ));
+            }
+            if (record.get('TestCases') && record.get('TestCases').Count){
+                promises.push(record.getCollection('TestCases', {
+                    fetch: ['FormattedID', 'Name', 'Type', 'WorkProduct']
+                }).load({
+                        requester: this,
+                        callback: function(testCases){
+                            record.get('TestCases').Results = testCases;
+                        }
+                    }
+                ));
+            }
+        });
+
+        if (promises.length > 0) {
+            Deft.Promise.all(promises).then({
+                success: this._onAllDataLoaded,
+                scope: this
+            });
+        } else {
+            this._onAllDataLoaded();
+        }
+    },
+
+    _onAllDataLoaded: function() {
+        _.each(this.store.getRange(), function(record) {
+            var defects = record.get('Defects');
+            var defectCount = (defects && defects.Count) || 0;
+            var tasks = record.get('Tasks');
+            var taskCount = (tasks && tasks.Count) || 0;
+            var testCases =  record.get('TestCases');
+            var testCaseCount = (testCases && testCases.Count) || 0;
+            var relatedCount = taskCount + defectCount + testCaseCount;
+            var planEstimate = record.get('PlanEstimate') || 1;
+            var pointSizeForChildren = (planEstimate / relatedCount) || 1;
+            var nullPointString = 'No tasks or defects.';
+
+            this._addPointForTopLevelItem(record, relatedCount);
+
+            if (relatedCount === 0) {
+                this._childChartData.push({
+                    name: nullPointString,
+                    y: planEstimate,
+                    color: '#FFF',
+                    rallyName: null,
+                    status: '',
+                    blocked: false,
+                    blockedReason: '',
+                    hasChildren: false,
+                    relatedCount: 0,
+                    ref: null,
+                    parentFormattedID: null
+                });
+            } else {
+                if (defects && defects.Results) {
+                    _.each(defects.Results, function(defect) {
+                        this._addPointForChildItem(defect, record.get('FormattedID'), pointSizeForChildren);
+                    }, this);
+                }
+
+                if (tasks && tasks.Results) {
+                    _.each(tasks.Results, function(task) {
+                        this._addPointForChildItem(task, record.get('FormattedID'), pointSizeForChildren);
+                    }, this);
+                }
+
+                if (testCases && testCases.Results) {
+                    _.each(testCases.Results, function(testCase) {
+                        this._addPointForChildItem(testCase, record.get('FormattedID'), pointSizeForChildren, record.get('ScheduleState'), record.get('Blocked'));
+                    }, this);
+                }
+            }
+        }, this);
+
+        var chart = this._createChartConfig();
+        this.add(chart);
+
+        this.recordLoadEnd();
+    },
+
+    _onLoad: function() {
+        this.fireEvent('contentupdated', this);
+        this.fireEvent('ready', this);
+        if (Rally.BrowserTest) {
+            Rally.BrowserTest.publishComponentReady(this);
+        }
+    },
+
+    _createChartConfig: function(overrides) {
+        var me = this;
+        var clickChartHandler = _.isFunction(this.clickHandler) ? this.clickHandler : Ext.emptyFn;
+        var height = this.height;
+        var pieHeight = this.height * 0.9;
+
+        return Ext.Object.merge({
+            xtype: 'rallychart',
+            loadMask: false,
+            updateAfterRender: Ext.bind(this._onLoad, this),
+
+            chartData: {
+                series: [
+                    {
+                        type: 'pie',
+                        name: 'Parents',
+                        data: this._chartData,
+                        size: pieHeight,
+                        allowPointSelect: false,
+                        dataLabels: {
+                            enabled: false
+                        }
+                    },
+                    {
+                        type: 'pie',
+                        name: 'Children',
+                        data: this._childChartData,
+                        size: pieHeight,
+                        innerSize: 0.8 * pieHeight,
+                        allowPointSelect: false,
+                        dataLabels: { enabled: false }
+                    }
+                ]
+            },
+
+            chartConfig: {
+                chart: {
+                    type: 'pie',
+                    height: height,
+                    width: this.width,
+                    spacingTop: 0,
+                    spacingRight: 3,
+                    spacingBottom: 0,
+                    spacingLeft: 3,
+                    events: {
+                        click: clickChartHandler
+                    }
+                },
+                subtitle: {
+                    useHTML: true,
+                    text: '<table align="center" class="pie-chart-legend"><tr><td><span class="legend-swatch defined-sample-swatch"></span><span>Defined</td>' +
+                    '<td><span class="legend-swatch in-progress-sample-swatch"></span>In-Progress</td>' +
+                    '<td><span class="legend-swatch completed-sample-swatch"></span>Completed</td>' +
+                    '<td><span class="legend-swatch blocked-sample-swatch"></span>Blocked</td></tr></table>',
+                    verticalAlign: 'bottom',
+                    floating: true,
+                    x: -10,
+                    y: -20
+                },
+                tooltip: {
+                    formatter: this._formatTooltip,
+                    useHTML: true
+                },
+                spacingTop: 0,
+                title: { text: null },
+                plotOptions: {
+                    pie: {
+                        cursor: 'pointer',
+                        shadow: false,
+                        center: ['50%', '45%'],
+                        point: {
+                            events: {
+                                click: function() {
+                                    var ref = this.ref;
+                                    if (ref) {
+                                        me.up('rallydialog').destroy();
+                                        Rally.nav.Manager.showDetail(ref);
+                                    }
+                                }
+                            }
+                        },
+                        showInLegend: false
+                    }
+                }
+            }
+        }, overrides || {});
+    },
+
+    _addPointForTopLevelItem: function(record, relatedCount) {
+        var blocked = record.get('Blocked');
+        var color = this._colorFromStatus(this._storyStates[record.get('ScheduleState')], blocked);
+        var pointSize = record.get('PlanEstimate') || 1;
+
+        this._chartData.push({
+            name: record.get('FormattedID'),
+            y: pointSize,
+            color: color,
+            rallyName: record.get('Name'),
+            status: record.get('ScheduleState'),
+            blocked: blocked,
+            blockedReason: blocked ? record.get('BlockedReason') : null,
+            hasChildren: relatedCount > 0,
+            relatedCount: relatedCount,
+            ref: record.get('_ref'),
+            parentFormattedID: null
+        });
+    },
+
+    _colorFromStatus: function(state, blocked) { //refactor into css and classes, should get cleaner
+        var progressColors = {
+            'Defined': '#C0C0C0', // light gray
+            'In-Progress': '#00A9E0', // cyan
+            'Completed': '#8DC63F', // lime
+            'Blocked': '#EE1C25' // red
+        };
+        var color =  progressColors[state];
+        if (blocked) {
+            color = progressColors.Blocked;
+        }
+        return color;
+    },
+
+    _addPointForChildItem: function(record, parentFormattedID, pointSize, parentState, isParentBlocked) {
+        var blocked = record.get('Blocked');
+        var state = record.get('ScheduleState') || record.get('State') || record.get('Type');
+        var color = this._colorFromStatus(this._storyStates[parentState || state], blocked || isParentBlocked);
+
+        this._childChartData.push({
+            name: record.get('FormattedID'),
+            y: pointSize,
+            color: color,
+            rallyName: record.get('Name'),
+            status: state,
+            blocked: blocked,
+            blockedReason: blocked ? record.get('BlockedReason') : null,
+            hasChildren: false,
+            relatedCount: 0,
+            ref: record.get('_ref'),
+            parentFormattedID: parentFormattedID
+        });
+    },
+
+    _formatTooltip: function() {
+        var relatedMessage = '';
+        var blockedMessage = '';
+        var artifactName = this.point.rallyName ? '<b>' + this.point.name + '</b>: ' + this.point.rallyName + '<br/>' : this.point.name;
+
+        if (this.point.blocked) {
+            blockedMessage = '<br/><b>Blocked</b>';
+            if (this.point.blockedReason) {
+                blockedMessage += ': ' + this.point.blockedReason;
+            }
+        }
+
+        if (this.point.series && this.point.series.name === 'Parents') {
+            relatedMessage = (this.point.relatedCount) ? '<br/>Related Items: ' + this.point.relatedCount : '';
+        }
+
+        return '<div style="min-width:200px;white-space:normal">' + artifactName + this.point.status + relatedMessage + blockedMessage + '</div>';
+    }
+});
+Ext.define("CArABU.technicalservices.IterationProgressChart", {
+    requires: [
+        "Rally.ui.chart.Chart"
+    ],
+
+    chartComponentConfig: {
+        xtype: "rallychart",
+        suppressClientMetrics: true /* keeps rallychart::lookback query time from displaying in client metrics */
+    }
+});
+Ext.define("CArABU.technicalservices.IterationProgressMixin", {
+    requires: [
+        "Rally.ui.chart.Chart"
+    ],
+
+    _configureYAxis: function(ticks, axis) {
+
+        var intervalY = (this.chartComponentConfig.chartConfig.yAxis[axis].max - 0) / (ticks - 1);
+        var ticksY = [];
+        for (var i = 0; i < ticks; i++) {
+            ticksY.push(i * intervalY);
+        }
+        this.chartComponentConfig.chartConfig.yAxis[axis].tickPositions = ticksY;
+    },
+
+    _configureYAxisIntervals: function () {
+        var ticks = 5; // not much chart space, limit to 5
+        this._configureYAxis(ticks, 0);
+        if(this.chartType === "burndown") { // cumulative flow only has y axis 0
+            this._configureYAxis(ticks, 1);
+        }
+    },
+
+    _getElementValue: function (element) {
+        if (element.textContent !== undefined) {
+            return element.textContent;
+        }
+        return element.text;
+    },
+
+    _getStringValues: function (elements) {
+        var i;
+        var strings = [];
+        for (i = 0; i < elements.length; i++) {
+            strings.push(this._getElementValue(elements[i]));
+        }
+        return strings;
+    },
+
+    _transformStringToNumber: function (element) {
+        return element.replace(',', '') * 1;
+    },
+
+    _getNumberFromXMLString: function (element) {
+        return this._transformStringToNumber(element.split(' ')[0]);
+    },
+
+    _getNumberValues: function (elements) {
+        var i;
+        var numbers = [];
+        for (i = 0; i < elements.length; i++) {
+            if(this._getElementValue(elements[i])) {
+                numbers.push(this._getNumberFromXMLString(this._getElementValue(elements[i])));
+            } else {
+                numbers.push(null);
+            }
+
+        }
+        return numbers;
+    },
+
+    _computeMaxYAxisValue: function(series) {
+        var i, j, max = 0.0;
+        // sum each day's values and find the largest sum
+        for(i=0; i < series[0].data.length; i++) {
+            var val = 0.0;
+            for(j=0; j < series.length; j++) {
+                // if is for insurance, _should_ always be true
+                if(series[j].data.length === series[0].data.length) {
+                    val += series[j].data[i];
+                }
+            }
+            if(val > max) {
+                max = val;
+            }
+        }
+        max = Math.ceil(max / 4) * 4;  // round up to multiple of 4 so we will create 5 integral tick marks
+
+        return (max === 0) ? 4 : max;
+    },
+
+    _createChartDatafromXML: function (xml) {
+        var parseXml;
+
+        if (typeof window.DOMParser !== "undefined") {
+            parseXml = function (xmlStr) {
+                return ( new window.DOMParser() ).parseFromString(xmlStr, "text/xml");
+            };
+        } else if (typeof window.ActiveXObject !== "undefined" &&
+            new window.ActiveXObject("Microsoft.XMLDOM")) {
+            parseXml = function (xmlStr) {
+                var xmlDoc = new window.ActiveXObject("Microsoft.XMLDOM");
+                xmlDoc.async = "false";
+                xmlDoc.loadXML(xmlStr);
+                return xmlDoc;
+            };
+        } else {
+            throw new Error("No XML parser found");
+        }
+
+        return parseXml(xml);
+    }
+});
 Ext.define('CArABU.technicalservices.BannerWidget', {
     extend: 'Ext.Component',
     alias: 'widget.bannerwidget',
@@ -847,6 +1434,191 @@ Ext.define('CArABU.technicalservices.ConfigurableGauge', {
         };
     }
 });
+Ext.define("CArABU.technicalservices.CumulativeFlowChart", {
+    alias: "widget.statsbannercumulativeflowchart",
+    extend: "Ext.Container",
+
+    mixins: [
+        "CArABU.technicalservices.IterationProgressMixin",
+        "CArABU.technicalservices.IterationProgressChart"
+    ],
+    cls: 'rally-iteration-progress-cumulative-flow-chart',
+    currentScope: undefined,
+    context: undefined,
+    height: undefined,
+    width: undefined,
+    displayTitle: 'Cumulative Flow',
+    minimalMode: false,
+    initComponent: function() {
+        this.callParent(arguments);
+
+        Ext.Ajax.request({
+            url: '/slm/charts/icfc.sp',
+            params: {
+                iterationOid: this.context.getTimeboxScope().getRecord().getId(),
+                cpoid: this.context.getProject().ObjectID,
+                bigChart: true
+            },
+            method: 'GET',
+            withCredentials: true,
+            success: function(response, request) {
+                this._loadData(response.responseText);
+            },
+            requester: this,
+            scope: this
+        });
+    },
+
+    _loadData: function(chartData) {
+        var xmlDoc = this._createChartDatafromXML(chartData);
+        this._createCumulativeFlowChartDatafromXML(xmlDoc);
+    },
+
+    _createMinimalConfig: function(){
+        var config = this._createChartConfig();
+        delete config.chartConfig.xAxis;
+        delete config.chartConfig.yAxis;
+
+        return Ext.Object.merge(config, {
+            chartConfig: {
+                tooltip: {
+                    formatter: function() {
+                        return false;
+                    }
+                },
+                legend: { enabled: false },
+                xAxis: {
+                    labels: { enabled: false },
+                    tickPositions: []
+                },
+                yAxis: [{
+                    title: {
+                        text: null
+                    },
+                    min: 0,
+                    labels: { enabled: false }
+                }],
+                title: { text: null }
+            }
+        });
+    },
+
+    _createChartConfig: function(overrides) {
+        var clickChartHandler = _.isFunction(this.clickHandler) ? this.clickHandler : Ext.emptyFn;
+
+        return Ext.Object.merge({
+            xtype: 'rallychart',
+            updateAfterRender: Ext.bind(this._onLoad, this),
+
+            chartColors: [  // RGB values obtained from here: http://ux-blog.rallydev.com/?cat=23
+                "#C0C0C0",  // $grey4
+                "#FF8200",  // $orange
+                "#F6A900",  // $gold
+                "#FAD200",  // $yellow
+                "#CADDA3",  // $lime
+                "#1E7C00"
+            ],
+            chartConfig: {
+                chart: {
+                    height: this.height,
+                    width: this.width,
+                    spacingTop: 2,
+                    spacingRight: 0,
+                    spacingBottom: 8,
+                    spacingLeft: 0,
+                    alignTicks: false,
+                    animation: true,
+                    type: "areaspline",
+                    events: {
+                        click: clickChartHandler
+                    }
+                },
+                plotOptions: {
+                    series: {
+                        animation: true,
+                        marker: {
+                            enabled: false,
+                            states: {
+                                hover: {
+                                    enabled: false
+                                }
+                            }
+                        }
+                    },
+                    areaspline: {
+                        point: {
+                            events: {
+                                click: clickChartHandler
+                            }
+                        },
+                        stacking: 'normal'
+                    }
+                },
+                legend: {
+                    enabled: true
+                },
+                title: { text: null },
+                xAxis: {
+                    tickmarkPlacement: 'on',
+                    tickInterval: 1
+                },
+                yAxis: [{
+                    title: { text: null },
+                    min: 0,
+                    labels: {
+                        style: { color: "#005eb8" }
+                    }
+                }]
+            },
+            chartData: {
+                categories: [],
+                series: []
+            }
+        }, overrides || {});
+    },
+
+    _createCumulativeFlowChartDatafromXML: function (xmlDoc) {
+
+        this.chartComponentConfig = this.minimalMode ? this._createMinimalConfig() : this._createChartConfig();
+
+        var xmlChartData = xmlDoc.getElementsByTagName("chart_data")[0];
+
+        var rows = xmlChartData.getElementsByTagName("row");
+        var i, j;
+        this.chartComponentConfig.chartData.categories = this._getStringValues(rows[0].getElementsByTagName("string")); // categories
+        for(j=rows.length-1, i = 0 ; j > 0; j--,i++) {
+            this.chartComponentConfig.chartData.series[i] = {};
+            this.chartComponentConfig.chartData.series[i].data = this._getNumberValues(rows[j].getElementsByTagName("number"));
+            this.chartComponentConfig.chartData.series[i].name = this._getStringValues(rows[j].getElementsByTagName("string"))[0];
+        }
+
+        // the 'max' y axis value in the xml isn't correct, so we'll calculate it ourselves...
+        this.chartComponentConfig.chartConfig.yAxis[0].max = this._computeMaxYAxisValue(this.chartComponentConfig.chartData.series);
+
+        this._configureYAxisIntervals();
+
+        // Use number of ScheduleState values to show as a surrogate for with of the legend text.
+        if(this.chartComponentConfig.chartData.series.length === 6) {
+            this.chartComponentConfig.chartConfig.legend.itemStyle = { fontSize: '8px'};
+        } else if(this.chartComponentConfig.chartData.series.length === 5) {
+            this.chartComponentConfig.chartConfig.legend.itemStyle = { fontSize: '10px'};
+        } // else it will default to 12px
+
+        this.chartComponentConfig.chartConfig.xAxis.tickInterval = Math.floor(this.chartComponentConfig.chartData.series[0].data.length / 4);
+
+        this.add(this.chartComponentConfig);
+    },
+
+
+    _onLoad: function() {
+        this.fireEvent('contentupdated', this);
+        this.fireEvent('ready', this);
+        if (Rally.BrowserTest) {
+            Rally.BrowserTest.publishComponentReady(this);
+        }
+    }
+});
+
 Ext.define('CArABU.technicalservices.IconWidget', {
     extend: 'CArABU.technicalservices.BannerWidget',
     alias:'widget.statsbannericonwidget',
@@ -905,6 +1677,565 @@ Ext.define('CArABU.technicalservices.IconWidget', {
         return {};
     }
 });
+Ext.define('CArABU.technicalservices.IterationProgressDialog', {
+    extend: 'Rally.ui.dialog.Dialog',
+    alias:'widget.statsbanneriterationprogressdialog',
+
+    config: {
+        startingIndex: 0,
+        autoShow: true,
+        draggable: true,
+        disableScroll: true,
+        width: 720, //820,
+        height: 550, //650,
+        closable: true,
+        constrain: true,
+        store: null,
+        context: null
+    },
+    layout: {
+        type: 'vbox',
+        align: 'center'
+    },
+    cls: 'iteration-progress-dialog',
+
+    constructor: function (config){
+        this.initConfig(config || {});
+        this.callParent(arguments);
+    },
+
+    initComponent: function(){
+        var chartWidth = 620;
+        var chartHeight = 450;
+
+        this.callParent(arguments);
+        this.toggle = this.add({
+            xtype: 'iterationprogressdialogcharttoggle',
+            startingIndex: this.startingIndex,
+            listeners: {
+                toggle: this._toggleButtonClick,
+                scope: this
+            }
+        });
+        this.carousel = this.add({
+            xtype: 'rallycarousel',
+            showDots: false,
+            enableAnimations: false,
+            carouselItems: [
+                {
+                    xtype: 'statsbannerpiechart',
+                    width: chartWidth,
+                    height: chartHeight,
+                    context: this.context
+                },
+                {
+                    xtype: 'statsbannerburndownchart',
+                    width: chartWidth,
+                    height: chartHeight,
+                    context: this.context,
+                    store: this.store
+                },
+                {
+                    xtype: 'statsbannercumulativeflowchart',
+                    width: chartWidth,
+                    height: chartHeight,
+                    context: this.context,
+                    store: this.store
+                }
+            ],
+            startingIndex: this.startingIndex,
+            listeners: {
+                carouselmove: {
+                    fn: this._onCarouselMove,
+                    scope: this
+                },
+                afterlayout: {
+                    fn: this._afterLayout,
+                    single: true,
+                    scope: this
+                }
+            }
+        });
+    },
+
+    _toggleButtonClick: function(toggleBtnContainer, buttonIndex){
+        this._setChart(buttonIndex);
+    },
+
+    _afterLayout: function(){
+        Ext.defer(this._setChart, 10, this, [this.startingIndex]);
+    },
+
+    _setChart: function(chartIndex) {
+        this.carousel.setCurrentItem(chartIndex);
+        this.toggle.setCurrentItem(chartIndex);
+        // need to bypass the setTitle method as it causes a relayout of the page messing up the carousel
+        this.header.titleCmp.textEl.update(this.carousel.getCurrentItem().displayTitle);
+    },
+
+    _onCarouselMove: function(carousel){
+        this._setChart(carousel.getCurrentItemIndex());
+    }
+});
+Ext.define("CArABU.technicalservices.MinimalPieChart", {
+    alias: "widget.statsbannerminimalpiechart",
+    extend: "CArABU.technicalservices.PieChart",
+
+    _loadArtifacts: function() {
+        this._chartData = [];
+        this._childChartData = [];
+        this._createDataPointsFromSummary();
+    },
+
+    _createDataPointsFromSummary: function() {
+        _.each(this.store.getRange(), function(record){
+            var summary = record.get('Summary');
+            var totalChildItems = 0;
+            var planEstimate = record.get('PlanEstimate') || 1;
+            var nullPointString = 'No tasks or defects.';
+            var testCases = record.get('TestCases');
+            var keys, state, scheduleState, blocked, count;
+
+            totalChildItems += summary.Defects ? summary.Defects.Count : 0;
+            totalChildItems += summary.Tasks ? summary.Tasks.Count : 0;
+            totalChildItems += testCases ? testCases.Count : 0;
+
+            var pointSizeForChildren = (planEstimate / totalChildItems) || 1;
+
+            this._addPointForTopLevelItem(record, totalChildItems);
+
+            if (totalChildItems === 0) {
+                this._childChartData.push({
+                    name: nullPointString,
+                    y: planEstimate,
+                    color: '#FFF',
+                    rallyName: null,
+                    status: '',
+                    blocked: false,
+                    blockedReason: '',
+                    hasChildren: false,
+                    relatedCount: 0,
+                    ref: null,
+                    parentFormattedID: null
+                });
+            }
+            if (summary.Tasks && summary.Tasks.Count){
+                keys = _.keys(summary.Tasks['state+blocked']);
+                _.each(keys, function(key) {
+                    state = key.split('+');
+                    scheduleState =  state[0];
+                    blocked = state[1] === 'true';
+                    count = summary.Tasks['state+blocked'][key];
+                    _.each(_.range(0, count), function(point) {
+                        this._addPointForChildItem(record.get('FormattedID'), pointSizeForChildren, scheduleState, blocked);
+                    }, this);
+                }, this);
+            }
+            if (summary.Defects && summary.Defects.Count){
+                keys = _.keys(summary.Defects['schedulestate+blocked']);
+                _.each(keys, function(key) {
+                    state = key.split('+');
+                    scheduleState =  state[0];
+                    blocked = state[1] === 'true';
+                    count = summary.Defects['schedulestate+blocked'][key];
+                    _.each(_.range(0, count), function(point) {
+                        this._addPointForChildItem(record.get('FormattedID'), pointSizeForChildren, scheduleState, blocked);
+                    }, this);
+                }, this);
+            }
+            if (testCases && testCases.Count){
+                _.each(_.range(0,testCases.Count), function(point){
+                    this._addPointForChildItem(record.get('FormattedID'), pointSizeForChildren, record.get('ScheduleState'), record.get('Blocked'));
+                }, this);
+            }
+        }, this);
+
+        var chart = this._createChartConfig();
+        this.add(chart);
+
+    },
+
+    _onAllDataLoaded: function() {
+        _.each(this.store.getRange(), function(record) {
+            var defects = record.get('Defects');
+            var defectCount = (defects && defects.Count) || 0;
+            var tasks = record.get('Tasks');
+            var taskCount = (tasks && tasks.Count) || 0;
+            var testCases =  record.get('TestCases');
+            var testCaseCount = (testCases && testCases.Count) || 0;
+            var relatedCount = taskCount + defectCount + testCaseCount;
+            var planEstimate = record.get('PlanEstimate') || 1;
+            var pointSizeForChildren = (planEstimate / relatedCount) || 1;
+            var nullPointString = 'No tasks or defects.';
+
+            this._addPointForTopLevelItem(record, relatedCount);
+
+            if (relatedCount === 0) {
+                this._childChartData.push({
+                    name: nullPointString,
+                    y: planEstimate,
+                    color: '#FFF',
+                    rallyName: null,
+                    status: '',
+                    blocked: false,
+                    blockedReason: '',
+                    hasChildren: false,
+                    relatedCount: 0,
+                    ref: null,
+                    parentFormattedID: null
+                });
+            } else {
+                if (defects && defects.Results) {
+                    _.each(defects.Results, function(defect) {
+                        this._addPointForChildItem(defect, record.get('FormattedID'), pointSizeForChildren);
+                    }, this);
+                }
+
+                if (tasks && tasks.Results) {
+                    _.each(tasks.Results, function(task) {
+                        this._addPointForChildItem(task, record.get('FormattedID'), pointSizeForChildren);
+                    }, this);
+                }
+
+                if (testCases && testCases.Results) {
+                    _.each(testCases.Results, function(testCase) {
+                        this._addPointForChildItem(testCase, record.get('FormattedID'), pointSizeForChildren, record.get('ScheduleState'), record.get('Blocked'));
+                    }, this);
+                }
+            }
+        }, this);
+
+        var chart = this._createChartConfig();
+        this.add(chart);
+
+        this.recordLoadEnd();
+    },
+
+    _createChartConfig: function(overrides) {
+        var clickChartHandler = _.isFunction(this.clickHandler) ? this.clickHandler : Ext.emptyFn;
+        var height = this.height;
+        return Ext.Object.merge({
+            xtype: 'rallychart',
+            loadMask: false,
+            updateAfterRender: Ext.bind(this._onLoad, this),
+
+            chartData: {
+                series: [
+                    {
+                        type:'pie',
+                        name: 'Parents',
+                        data: this._chartData,
+                        size: height,
+                        allowPointSelect: false,
+                        dataLabels: {
+                            enabled: false
+                        }
+                    },
+                    {
+                        type:'pie',
+                        name: 'Children',
+                        data: this._childChartData,
+                        size: height,
+                        innerSize: 0.8 * height,
+                        allowPointSelect: false,
+                        dataLabels: { enabled: false }
+                    }
+                ]
+            },
+
+            chartConfig: {
+                chart: {
+                    type: 'pie',
+                    height: height,
+                    width: this.width,
+                    spacingTop: 0,
+                    spacingRight: 0,
+                    spacingBottom: 0,
+                    spacingLeft: 0,
+                    events: {
+                        click: clickChartHandler
+                    }
+                },
+                tooltip: {
+                    formatter: function() {
+                        return false;
+                    }
+                },
+                spacingTop: 0,
+                title: { text: null },
+                plotOptions: {
+                    pie: {
+                        shadow: false,
+                        center: ['50%', '50%'],
+                        point: {
+                            events: {
+                                click: clickChartHandler
+                            }
+                        },
+                        showInLegend: false
+                    }
+                }
+            }
+        }, overrides || {});
+    },
+
+    _addPointForTopLevelItem: function(record, relatedCount) {
+        var blocked = record.get('Blocked');
+        var color = this._colorFromStatus(this._storyStates[record.get('ScheduleState')], blocked);
+        var pointSize = record.get('PlanEstimate') || 1;
+
+        this._chartData.push({
+            name: record.get('FormattedID'),
+            y: pointSize,
+            color: color,
+            rallyName: record.get('Name'),
+            status: record.get('ScheduleState'),
+            blocked: blocked,
+            blockedReason: blocked ? record.get('BlockedReason') : null,
+            hasChildren: relatedCount > 0,
+            relatedCount: relatedCount,
+            ref: record.get('_ref'),
+            parentFormattedID: null
+        });
+    },
+
+    _addPointForChildItem: function(parentFormattedID, pointSize, state, blocked) {
+        var color = this._colorFromStatus(this._storyStates[state], blocked);
+
+        this._childChartData.push({
+            y: pointSize,
+            color: color,
+            status: state,
+            blocked: blocked,
+            hasChildren: false,
+            relatedCount: 0,
+            parentFormattedID: parentFormattedID
+        });
+    }
+});
+Ext.define("CArABU.technicalservices.BurndownChart", {
+    alias: "widget.statsbannerburndownchart",
+    extend: "Ext.Container",
+    mixins: [
+        "CArABU.technicalservices.IterationProgressMixin",
+        "CArABU.technicalservices.IterationProgressChart"
+    ],
+
+    currentScope: undefined,
+    context: undefined,
+    height: undefined,
+    width: undefined,
+    displayTitle: 'Burndown',
+    minimalMode: false,
+    onChartDataLoaded: Ext.emptyFn,
+
+    initComponent: function() {
+        this.callParent(arguments);
+
+        Ext.Ajax.request({
+            url: '/slm/charts/itsc.sp',
+            params: {
+                iterationOid: this.context.getTimeboxScope().getRecord().getId(),
+                cpoid: this.context.getProject().ObjectID
+            },
+            method: 'GET',
+            withCredentials: true,
+            success: function(response, request) {
+                this._loadData(response.responseText);
+            },
+            requester: this,
+            scope: this
+        });
+    },
+
+    _loadData: function(chartData) {
+        var xmlDoc = this._createChartDatafromXML(chartData);
+        this._createBurndownChartDatafromXML(xmlDoc);
+    },
+
+    _createChartConfig: function(overrides) {
+        var clickChartHandler = _.isFunction(this.clickHandler) ? this.clickHandler : Ext.emptyFn;
+
+        return Ext.Object.merge({
+            xtype: 'rallychart',
+            chartColors: ["#005eb8", "#666666", "#8dc63f" ],
+            updateAfterRender: Ext.bind(this._onLoad, this),
+
+            chartConfig: {
+                chart: {
+                    height: this.height,
+                    width: this.width,
+                    spacingTop: 2,
+                    spacingRight: 0,
+                    spacingBottom: 8,
+                    spacingLeft: 0,
+                    zoomType: 'xy',
+                    alignTicks: false,
+                    animation: true,
+                    events: {
+                        click: clickChartHandler
+                    }
+                },
+                plotOptions: {
+                    series: {
+                        animation: true,
+                        shadow: false,
+                        borderWidth: 0,
+                        marker: {
+                            enabled: false,
+                            states: {
+                                hover: {
+                                    enabled: false
+                                }
+                            }
+                        },
+                        events: {
+                            click: clickChartHandler
+                        }
+                    },
+                    column: {
+                        point: {
+                            events: {
+                                click: clickChartHandler
+                            }
+                        }
+                    }
+                },
+                legend: { enabled: true },
+                title: { text: null },
+                xAxis: {
+                    tickmarkPlacement: 'on',
+                    tickInterval: 1
+                },
+                yAxis: [
+                    {
+                        title: { text: null },
+                        min: 0,
+                        labels: { style: { color: "#005eb8" } }
+                    },
+                    {
+                        title: { text: null },
+                        min: 0,
+                        opposite: true,
+                        labels: { style: { color: "#8dc63f" } }
+                    }
+                ]
+            },
+            chartData: {
+                categories: [],
+                series: [
+                    {
+                        name: "To Do",
+                        type: "column",
+                        data: [],
+                        tooltip: { enabled: false }
+                    },
+                    {
+                        name: "Ideal",
+                        type: "line",
+                        dashStyle: "Solid",
+                        data: [],
+                        marker : {
+                            enabled : true,
+                            radius : 3
+                        },
+                        tooltip: { enabled: false }
+                    },
+                    {
+                        name: "Accepted",
+                        type: "column",
+                        data: [],
+                        yAxis: 1,
+                        tooltip: { enabled: false }
+                    }
+                ]
+            }
+        }, overrides || {});
+    },
+
+    _createMinimalConfig: function(){
+        var config = this._createChartConfig();
+        delete config.chartConfig.xAxis;
+        delete config.chartConfig.yAxis;
+        delete config.chartData.series[1].marker;
+
+        config = Ext.Object.merge(config, {
+            chartConfig: {
+                chart: {
+                    zoomType: ''
+                },
+                tooltip: {
+                    formatter: function() {
+                        return false;
+                    }
+                },
+                legend: { enabled: false },
+                xAxis: {
+                    labels: { enabled: false },
+                    tickPositions: []
+                },
+
+                yAxis: [
+                    {
+                        title: { text: null },
+                        min: 0,
+                        labels: { enabled: false }
+                    },
+                    {
+                        title: { text: null },
+                        min: 0,
+                        opposite: true,
+                        labels: { enabled: false }
+                    }
+                ],
+                title: { text: null }
+            }
+        });
+        return config;
+    },
+
+    _createBurndownChartDatafromXML: function (xmlDoc) {
+
+        this.chartComponentConfig = this.minimalMode ? this._createMinimalConfig() : this._createChartConfig();
+
+        var xmlChartData = xmlDoc.getElementsByTagName("chart_data")[0];
+        var xmlChartValueText = xmlDoc.getElementsByTagName("chart_value_text")[0];
+        var draw = xmlDoc.getElementsByTagName("draw")[0];
+        var axis_value = xmlDoc.getElementsByTagName("axis_value")[1];
+
+        var rows = xmlChartData.getElementsByTagName("row");
+
+        // this makes no sense...The thing labeled Accepted in the <chart_data> element, isn't.
+        // The thing that is Accepted, is buried in the <chart_value_text> element
+
+        this.chartComponentConfig.chartData.categories = this._getStringValues(rows[0].getElementsByTagName("string")); // categories
+        this.chartComponentConfig.chartData.series[0].data = this._getNumberValues(rows[1].getElementsByTagName("number")); //todo;
+        this.chartComponentConfig.chartData.series[1].data = this._getNumberValues(rows[3].getElementsByTagName("number")); //ideal;
+        this.chartComponentConfig.chartData.series[2].data = this._getNumberValues(xmlChartValueText.getElementsByTagName("row")[2].getElementsByTagName("number")); //accepted;
+        this.chartComponentConfig.chartConfig.yAxis[0].max = axis_value.getAttribute("max") * 1;
+
+        var texts = draw.getElementsByTagName("text");
+        // find the last <text element with orientation="vertical_down" attribute, that's the max y-axis 2 setting
+        for (i = 0; i < texts.length; i++) {
+            if (texts[i].getAttribute("orientation") === "vertical_down") {
+                this.chartComponentConfig.chartConfig.yAxis[1].max = (this._getElementValue(texts[i]) * 1);
+            }
+        }
+        this._configureYAxisIntervals();
+
+        this.chartComponentConfig.chartConfig.xAxis.tickInterval = Math.floor(this.chartComponentConfig.chartData.series[0].data.length / 4);
+
+        this.add(this.chartComponentConfig);
+    },
+
+    _onLoad: function() {
+        this.fireEvent('contentupdated', this);
+        this.fireEvent('ready', this);
+        if (Rally.BrowserTest) {
+            Rally.BrowserTest.publishComponentReady(this);
+        }
+    }
+});
 Ext.define('CArABU.technicalservices.Accepted', {
     extend: 'CArABU.technicalservices.ConfigurableGauge',
     alias:'widget.statsbanneraccepted',
@@ -927,6 +2258,8 @@ Ext.define('CArABU.technicalservices.Accepted', {
             var iteration = r.get('Iteration'),
                 planEst = r.get('PlanEstimate') || 0;
             //Todo, we are not including dates in the check becausehis is mainly checking to eliminate second class defects.
+            console.log('accepteddate', r.getData(), r.get('AcceptedDate'));
+
             if (planEst && iteration && iteration.Name === name){
                 total += planEst;
                 if (r.get('AcceptedDate')){
@@ -1006,9 +2339,16 @@ Ext.define('CArABU.technicalservices.Defects', {
         var activeDefects = 0;
 
         Ext.Array.each(this.store.getRange(), function(r) {
-             var type = r.get('_type');
-             if (type.toLowerCase() === 'defect' && !r.get('ClosedDate')){
+             var defectState = r.get('State') || null;
+             if (defectState === "Closed"){
                 activeDefects++;
+             }
+             var summary = r.get('Summary');
+             if (summary && summary.Defects && summary.Defects.State){
+                 var defectCount = summary.Defects.Count || 0,
+                     closedDefectCount = summary.Defects.State.Closed || 0;
+
+                 activeDefects += (defectCount - closedDefectCount);
              }
         });
 
@@ -1199,6 +2539,201 @@ Ext.define('CArABU.technicalservices.PlannedVelocity', {
     }
 });
 
+Ext.define('CArABU.technicalservices.IterationProgress', {
+    extend: 'CArABU.technicalservices.BannerWidget',
+    alias:'widget.statsbanneriterationprogress',
+
+    config: {
+        context: null,
+        store: null
+    },
+
+    currentChartDisplayed: 0,
+
+    stateId: 'stats-banner-iteration-progress',
+    stateful: true,
+
+    tpl: [
+        '<div class="expanded-widget">',
+        '<div class="stat-title"></div>',
+        '<div class="stat-metric">',
+        '<div class="stat-carousel"></div>',
+        '</div>',
+        '</div>',
+        '<div class="collapsed-widget">',
+        '<span class="metric-icon icon-pie"></span>',
+        '<div class="stat-title"></div>',
+        '</div>'
+    ],
+
+    constructor: function(config) {
+        this.stateId = Rally.environment.getContext().getScopedStateId(this.stateId);
+        this.callParent(arguments);
+    },
+
+    initComponent: function(){
+        this.mon(this.store, 'datachanged', this.onDataChanged, this);
+        this.callParent(arguments);
+
+        this.callParent(arguments);
+        var boundClickHandler = Ext.bind(this._onChartClick, this);
+
+        this.carouselItems = [{
+            xtype: 'statsbannerminimalpiechart',
+            width: 150,
+            height: 60,
+            minimalMode: true,
+            clickHandler: boundClickHandler,
+            context: this.context,
+            store: this.store
+        },{
+            xtype: 'statsbannerburndownchart',
+            width: 150,
+            height: 63,
+            minimalMode: true,
+            clickHandler: boundClickHandler,
+            context: this.context,
+            store: this.store
+        },{
+            xtype: 'statsbannercumulativeflowchart',
+            width: 150,
+            height: 63,
+            minimalMode: true,
+            clickHandler: boundClickHandler,
+            context: this.context,
+            store: this.store
+        }];
+
+        _.each(this.carouselItems, function(carouselItem) {
+            carouselItem.listeners = {
+                ready: this._onChartReady,
+                scope: this
+            };
+        }, this);
+
+
+        this._pendingChartReadies = this.carouselItems.length;
+    },
+
+    expand: function() {
+        this.callParent();
+        if (!this.carousel || this.carousel.getWidth() === 0) {
+            this.onDataChanged();
+        }
+    },
+
+    _onChartReady: function() {
+        this._pendingChartReadies -= 1;
+        if (this._pendingChartReadies === 0) {
+            this.fireEvent('ready', this);
+        }
+    },
+
+    _onChartClick: function() {
+        var currentIndex = this.carousel.getCurrentItemIndex();
+        Ext.create('CArABU.technicalservices.IterationProgressDialog', {
+            startingIndex: currentIndex,
+            store: this.store,
+            context: this.context
+        });
+    },
+
+    _cleanupCarousel: function () {
+        if (this.carousel) {
+            this.carousel.destroy();
+            delete this.carousel;
+        }
+    },
+    onDestroy: function () {
+        this._cleanupCarousel();
+        this.callParent(arguments);
+    },
+
+    onRender: function() {
+        this.callParent(arguments);
+        if (this._getTimebox()) {
+            this._addPlaceholder();
+        }
+    },
+    _getTimebox: function(){
+        return this.timeboxRecord || null;
+    },
+    applyState: function (state) {
+        if (state){
+            if (state.currentChartDisplayed > this.carouselItems.length -1 || state.currentChartDisplayed < 0) {
+                this.currentChartDisplayed = 0;
+            } else {
+                this.currentChartDisplayed = state.currentChartDisplayed;
+            }
+        }
+    },
+    getState: function(){
+        return {
+            currentChartDisplayed: this.currentChartDisplayed
+        };
+    },
+
+    onDataChanged: function() {
+        this._cleanupCarousel();
+        if(this.rendered) {
+            if (this._getTimebox()) {
+                this.update();
+
+                this.createCarousel();
+            } else {
+                this._addPlaceholder();
+            }
+        }
+    },
+
+    createCarousel: function() {
+        this.carousel = Ext.create('Rally.ui.carousel.Carousel', {
+            showHeader: false,
+            showDots: true,
+            smallDots: true,
+            renderTo: this.getEl().down('.stat-carousel'),
+            height: 75,
+            layout: {
+                type: 'vbox',
+                align: 'center'
+            },
+            listeners: {
+                currentitemset: this._updateTitle,
+                carouselmove: this._updateTitle,
+                scope: this
+            },
+            carouselItems: this.carouselItems
+        });
+
+        if (!Ext.isIE8m){
+            // if such next line runs IE8 or < goes boom! WOW!
+            this.carousel.setCurrentItem(this.currentChartDisplayed);
+        }
+
+        this.carousel.on('carouselmove', this._chartShownChanged, this);
+    },
+
+    _updateTitle: function(carousel){
+        _.each(this.getEl().query('.stat-title'), function(el){
+            Ext.fly(el).update(carousel.getCurrentItem().displayTitle);
+        }, this);
+    },
+    _chartShownChanged: function(){
+        var chartShown = _.findIndex(this.carouselItems, {xtype: this.carousel.getCurrentItem().xtype});
+        this.currentChartDisplayed = chartShown || 0;
+        this.saveState();
+    },
+    _addPlaceholder: function() {
+        this.update();
+
+        if (this.expanded) {
+            this.carousel = Ext.create('Ext.Container', {
+                renderTo: this.getEl().down('.stat-carousel'),
+                html: 'no iteration data'
+            });
+        }
+    }
+});
 Ext.define('CArABU.technicalservices.Tasks', {
     extend: 'CArABU.technicalservices.IconWidget',
     alias:'widget.statsbannertasks',
@@ -1207,9 +2742,9 @@ Ext.define('CArABU.technicalservices.Tasks', {
         console.log('this',this.statIcon, this.unitLabel, this.title, this.statUnits);
         var activeTasks = 0;
         Ext.Array.each(this.store.getRange(), function(r) {
-            var type = r.get('_type');
-            if (type.toLowerCase() === 'task' && r.get('State') !== 'Completed'){
-                activeTasks++;
+            var summary = r.get('Summary');
+            if (summary.Tasks && summary.Tasks.State){
+                activeTasks += (summary.Tasks.State.Defined || 0 + summary.Tasks.State['In-Progress'] || 0);
             }
         });
 
@@ -1267,12 +2802,15 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
             unitLabel: 'active',
             statIcon: 'icon-defect',
             flex: 2
-        },{
+        }, {
             xtype: 'statsbannertasks',
             title: 'Tasks',
             statIcon: 'icon-task',
             unitLabel: 'active',
             flex: 2
+        },{
+            xtype: 'statsbanneriterationprogress',
+            flex: 4
         },{
             xtype: 'statsbannercollapseexpand',
             flex: 0
@@ -1415,19 +2953,7 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
             property: 'Iteration.EndDate',
             value: this.timeboxRecord.get('EndDate')
         }];
-        var workItemFilters = Rally.data.wsapi.Filter.and(filters),
-            defectFilters = Rally.data.wsapi.Filter.and([{
-                property: 'Requirement.Iteration.Name',
-                value: this.timeboxRecord.get('Name')
-            },{
-                property: 'Requirement.Iteration.StartDate',
-                value: this.timeboxRecord.get('StartDate')
-            },{
-                property: 'Requirement.Iteration.EndDate',
-                value: this.timeboxRecord.get('EndDate')
-            }]);
-
-        filters = workItemFilters.or(defectFilters);
+        filters = Rally.data.wsapi.Filter.and(filters);
 
         if (customFilters && customFilters.filters && customFilters.filters.length > 0  && customFilters.types &&
             (Ext.Array.contains(customFilters.types, 'hierarchicalrequirement') || Ext.Array.contains(customFilters.types, 'defect'))
@@ -1442,10 +2968,27 @@ Ext.define('CArABU.technicalservices.StatsBanner', {
         var filters = this._getWorkItemFilters(customFilters);
 
         this.store = Ext.create('Rally.data.wsapi.artifact.Store', {
-            models: ['HierarchicalRequirement','Defect','Task'],
-            fetch: ['ObjectID', 'FormattedID', 'ScheduleState','AcceptedDate','ClosedDate', 'PlanEstimate','Iteration','Name','StartDate','EndDate','State'],
+            models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
+            fetch: ['ObjectID',
+                'FormattedID',
+                'ScheduleState',
+                'AcceptedDate',
+                'ClosedDate',
+                'PlanEstimate',
+                'Iteration',
+                'Name',
+                'StartDate',
+                'EndDate',
+                'State',
+                'Defects:summary[State]',
+                'Tasks:summary[State;Blocked]',
+                'TestCases:summary'],
             filters: filters,
             pageSize: 1000,
+            sorters: [{
+                property: 'ScheduleState',
+                direction:'ASC'
+            }],
             context: this.context.getDataContext(),
             limit: 'Infinity'
         });
@@ -1675,7 +3218,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             models: this.getModelNames(),
             enableHierarchy: true,
             filters: this.getIterationFilter(),
-            fetch: ['Feature','Parent','ObjectID']
+            //fetch: ['Feature','Parent','ObjectID']
         }).then({
             success: this.buildBoard,
             scope: this
@@ -1733,7 +3276,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             iterationFilters = this.getIterationFilter();
         this.logger.log('buildBoard iterationFilters', iterationFilters.toString());
 
-        store.load();
+        //store.load();
         this.getGridBox().add({
             xtype: 'rallygridboard',
             context: context,

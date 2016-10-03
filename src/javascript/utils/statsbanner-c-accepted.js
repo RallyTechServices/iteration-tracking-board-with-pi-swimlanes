@@ -20,6 +20,8 @@ Ext.define('CArABU.technicalservices.Accepted', {
             var iteration = r.get('Iteration'),
                 planEst = r.get('PlanEstimate') || 0;
             //Todo, we are not including dates in the check becausehis is mainly checking to eliminate second class defects.
+            console.log('accepteddate', r.getData(), r.get('AcceptedDate'));
+
             if (planEst && iteration && iteration.Name === name){
                 total += planEst;
                 if (r.get('AcceptedDate')){

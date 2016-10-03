@@ -7,9 +7,16 @@ Ext.define('CArABU.technicalservices.Defects', {
         var activeDefects = 0;
 
         Ext.Array.each(this.store.getRange(), function(r) {
-             var type = r.get('_type');
-             if (type.toLowerCase() === 'defect' && !r.get('ClosedDate')){
+             var defectState = r.get('State') || null;
+             if (defectState === "Closed"){
                 activeDefects++;
+             }
+             var summary = r.get('Summary');
+             if (summary && summary.Defects && summary.Defects.State){
+                 var defectCount = summary.Defects.Count || 0,
+                     closedDefectCount = summary.Defects.State.Closed || 0;
+
+                 activeDefects += (defectCount - closedDefectCount);
              }
         });
 

@@ -166,7 +166,7 @@ Ext.define("CArABU.technicalservices.PieChart", {
         var chart = this._createChartConfig();
         this.add(chart);
 
-        this.recordLoadEnd();
+        //this.recordLoadEnd();
     },
 
     _onLoad: function() {

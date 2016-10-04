@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Oct 03 2016 17:37:15 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Oct 03 2016 19:46:05 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Oct 03 2016 17:37:15 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Oct 03 2016 19:46:05 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 282866107215;
+        var CHECKSUM = 282878971029;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -855,7 +855,7 @@ Ext.define("CArABU.technicalservices.PieChart", {
         var chart = this._createChartConfig();
         this.add(chart);
 
-        this.recordLoadEnd();
+        //this.recordLoadEnd();
     },
 
     _onLoad: function() {

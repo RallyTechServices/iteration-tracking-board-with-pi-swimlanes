@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Oct 18 2016 19:27:55 GMT-0700 (PDT) -->
+    <!--  Build Date: Tue Oct 18 2016 20:47:28 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Oct 18 2016 19:27:55 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Tue Oct 18 2016 20:47:28 GMT-0700 (PDT)";
         var BUILDER = "jmartin";
-        var CHECKSUM = 288647766573;
+        var CHECKSUM = 297493243969;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -236,9 +236,47 @@ Ext.override(Rally.ui.cardboard.row.Header, {
     }
 });
 
+Ext.override(Rally.ui.gridboard.plugin.GridBoardInlineFilterControl,{
+//    _onFilterChange: function(inlineFilterButton) {
+//        console.log('_onFilterChange',inlineFilterButton.getTypesAndFilters());
+//        this.cmp.applyCustomFilter(Ext.apply({
+//            recordMetrics: true
+//        }, inlineFilterButton.getTypesAndFilters()));
+//        inlineFilterButton.inlineFilterPanel.fireEvent('afterfilterchange');
+//    },
+//
+//    setCurrentView: function(view) {
+//        console.log('setCurrentView');
+//        var inlineFilterButton = this.getControlCmp().getComponent('inlineFilterButton');
+//        console.log('inlineFilterButton', inlineFilterButton);
+//        
+//        var stateId = inlineFilterButton.getStateId();
+//        console.log('stateId', stateId);
+//        var state = _.pick(view, this.sharedViewState);
+//        console.log('state', state);
+//        
+//        Ext.apply(state, _.pick(inlineFilterButton.getState(), 'collapsed', 'advancedCollapsed'));
+//        console.log('state -- ', state);
+//        console.log('button state:', inlineFilterButton.getState());
+//        
+//        Ext.state.Manager.set(stateId, state);
+//        
+//        //inlineFilterButton.applyState(stripped_state);
+//        Ext.merge(inlineFilterButton, inlineFilterButton._transformStateToConfig(state));
+//        inlineFilterButton._applyFilters();
+//        
+//        //this._onFilterChange(inlineFilterButton);
+//    }
+});
+
+
+Ext.override(Rally.ui.gridboard.SharedViewComboBox,{
+
+});
+
+
+
 Ext.override(Rally.ui.cardboard.CardBoard,{
-
-
     _createColumnDefinition: function (columnConfig) {
         var config = Ext.merge({
             enableCrossColumnRanking: this.enableCrossColumnRanking
@@ -363,7 +401,6 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
 
     
     _hasValidRowField: function() {
-        console.log('_hasValidRowField',this.rowConfig, this.validPortfolioItems);
         
         if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
         
@@ -3305,12 +3342,22 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             modelNames: modelNames,
             toggleState: 'grid',
             plugins: [
-                'rallygridboardaddnew',{
+                'rallygridboardaddnew',
+                {
+                    ptype: 'rallygridboardfieldpicker',
+                    headerPosition: 'left',
+                    modelNames: modelNames,
+                    stateful: true,
+                    stateId: context.getScopedStateId('columns-example'),
+                    margin: margin
+                },
+                {
                     ptype: 'rallygridboardinlinefiltercontrol',
                     inlineFilterButtonConfig: {
                         stateful: true,
                         stateId: context.getScopedStateId('filters'),
                         modelNames: modelNames,
+                        margin: margin,
                         inlineFilterPanelConfig: {
                             quickFilterPanelConfig: {
                                 defaultFields: [
@@ -3321,14 +3368,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                             }
                         }
                     }
-                },{
-                    ptype: 'rallygridboardfieldpicker',
-                    headerPosition: 'left',
-                    modelNames: modelNames,
-                    stateful: true,
-                    stateId: context.getScopedStateId('columns-example')
                 },
-                'rallygridboardtoggleable',
                 {
                     ptype: 'rallygridboardsharedviewcontrol',
                     stateful: true,
@@ -3351,7 +3391,8 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                     buttonConfig: {
                         iconCls: 'icon-export'
                     }
-                }
+                },
+                'rallygridboardtoggleable'
             ],
             cardBoardConfig: this.getCardboardConfig(iterationFilters),
             gridConfig: {

@@ -1,6 +1,44 @@
+Ext.override(Rally.ui.gridboard.plugin.GridBoardInlineFilterControl,{
+//    _onFilterChange: function(inlineFilterButton) {
+//        console.log('_onFilterChange',inlineFilterButton.getTypesAndFilters());
+//        this.cmp.applyCustomFilter(Ext.apply({
+//            recordMetrics: true
+//        }, inlineFilterButton.getTypesAndFilters()));
+//        inlineFilterButton.inlineFilterPanel.fireEvent('afterfilterchange');
+//    },
+//
+//    setCurrentView: function(view) {
+//        console.log('setCurrentView');
+//        var inlineFilterButton = this.getControlCmp().getComponent('inlineFilterButton');
+//        console.log('inlineFilterButton', inlineFilterButton);
+//        
+//        var stateId = inlineFilterButton.getStateId();
+//        console.log('stateId', stateId);
+//        var state = _.pick(view, this.sharedViewState);
+//        console.log('state', state);
+//        
+//        Ext.apply(state, _.pick(inlineFilterButton.getState(), 'collapsed', 'advancedCollapsed'));
+//        console.log('state -- ', state);
+//        console.log('button state:', inlineFilterButton.getState());
+//        
+//        Ext.state.Manager.set(stateId, state);
+//        
+//        //inlineFilterButton.applyState(stripped_state);
+//        Ext.merge(inlineFilterButton, inlineFilterButton._transformStateToConfig(state));
+//        inlineFilterButton._applyFilters();
+//        
+//        //this._onFilterChange(inlineFilterButton);
+//    }
+});
+
+
+Ext.override(Rally.ui.gridboard.SharedViewComboBox,{
+
+});
+
+
+
 Ext.override(Rally.ui.cardboard.CardBoard,{
-
-
     _createColumnDefinition: function (columnConfig) {
         var config = Ext.merge({
             enableCrossColumnRanking: this.enableCrossColumnRanking
@@ -125,7 +163,6 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
 
     
     _hasValidRowField: function() {
-        console.log('_hasValidRowField',this.rowConfig, this.validPortfolioItems);
         
         if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
         

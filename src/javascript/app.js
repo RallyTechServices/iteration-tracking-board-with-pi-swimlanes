@@ -289,12 +289,22 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             modelNames: modelNames,
             toggleState: 'grid',
             plugins: [
-                'rallygridboardaddnew',{
+                'rallygridboardaddnew',
+                {
+                    ptype: 'rallygridboardfieldpicker',
+                    headerPosition: 'left',
+                    modelNames: modelNames,
+                    stateful: true,
+                    stateId: context.getScopedStateId('columns-example'),
+                    margin: margin
+                },
+                {
                     ptype: 'rallygridboardinlinefiltercontrol',
                     inlineFilterButtonConfig: {
                         stateful: true,
                         stateId: context.getScopedStateId('filters'),
                         modelNames: modelNames,
+                        margin: margin,
                         inlineFilterPanelConfig: {
                             quickFilterPanelConfig: {
                                 defaultFields: [
@@ -305,14 +315,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                             }
                         }
                     }
-                },{
-                    ptype: 'rallygridboardfieldpicker',
-                    headerPosition: 'left',
-                    modelNames: modelNames,
-                    stateful: true,
-                    stateId: context.getScopedStateId('columns-example')
                 },
-                'rallygridboardtoggleable',
                 {
                     ptype: 'rallygridboardsharedviewcontrol',
                     stateful: true,
@@ -335,7 +338,8 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                     buttonConfig: {
                         iconCls: 'icon-export'
                     }
-                }
+                },
+                'rallygridboardtoggleable'
             ],
             cardBoardConfig: this.getCardboardConfig(iterationFilters),
             gridConfig: {

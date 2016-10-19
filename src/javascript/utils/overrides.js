@@ -123,8 +123,12 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
         return Deft.Promise.when();
     },
 
+    
     _hasValidRowField: function() {
-
+        console.log('_hasValidRowField',this.rowConfig, this.validPortfolioItems);
+        
+        if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
+        
         var field = this.rowConfig && this.rowConfig.field;
         if (Ext.Array.contains(this.validPortfolioItems, field)){
             return true;

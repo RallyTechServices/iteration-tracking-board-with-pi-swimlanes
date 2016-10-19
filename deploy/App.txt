@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Oct 18 2016 18:34:12 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Oct 18 2016 19:27:55 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Oct 18 2016 18:34:12 GMT-0600 (MDT)";
-        var BUILDER = "kcorkan";
-        var CHECKSUM = 287695417922;
+        var APP_BUILD_DATE = "Tue Oct 18 2016 19:27:55 GMT-0700 (PDT)";
+        var BUILDER = "jmartin";
+        var CHECKSUM = 288647766573;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -361,8 +361,12 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
         return Deft.Promise.when();
     },
 
+    
     _hasValidRowField: function() {
-
+        console.log('_hasValidRowField',this.rowConfig, this.validPortfolioItems);
+        
+        if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
+        
         var field = this.rowConfig && this.rowConfig.field;
         if (Ext.Array.contains(this.validPortfolioItems, field)){
             return true;
@@ -3285,6 +3289,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         return boardConfig;
 
     },
+    
     buildBoard: function(store){
 
         var modelNames = this.getModelNames(),

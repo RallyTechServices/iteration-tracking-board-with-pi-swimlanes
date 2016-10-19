@@ -273,6 +273,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         return boardConfig;
 
     },
+    
     buildBoard: function(store){
 
         var modelNames = this.getModelNames(),

@@ -1,37 +1,3 @@
-Ext.override(Rally.ui.gridboard.plugin.GridBoardInlineFilterControl,{
-//    _onFilterChange: function(inlineFilterButton) {
-//        console.log('_onFilterChange',inlineFilterButton.getTypesAndFilters());
-//        this.cmp.applyCustomFilter(Ext.apply({
-//            recordMetrics: true
-//        }, inlineFilterButton.getTypesAndFilters()));
-//        inlineFilterButton.inlineFilterPanel.fireEvent('afterfilterchange');
-//    },
-//
-//    setCurrentView: function(view) {
-//        console.log('setCurrentView');
-//        var inlineFilterButton = this.getControlCmp().getComponent('inlineFilterButton');
-//        console.log('inlineFilterButton', inlineFilterButton);
-//        
-//        var stateId = inlineFilterButton.getStateId();
-//        console.log('stateId', stateId);
-//        var state = _.pick(view, this.sharedViewState);
-//        console.log('state', state);
-//        
-//        Ext.apply(state, _.pick(inlineFilterButton.getState(), 'collapsed', 'advancedCollapsed'));
-//        console.log('state -- ', state);
-//        console.log('button state:', inlineFilterButton.getState());
-//        
-//        Ext.state.Manager.set(stateId, state);
-//        
-//        //inlineFilterButton.applyState(stripped_state);
-//        Ext.merge(inlineFilterButton, inlineFilterButton._transformStateToConfig(state));
-//        inlineFilterButton._applyFilters();
-//        
-//        //this._onFilterChange(inlineFilterButton);
-//    }
-});
-
-
 Ext.override(Rally.ui.gridboard.SharedViewComboBox,{
 
 });
@@ -359,16 +325,18 @@ Ext.override(Rally.ui.cardboard.row.Row,{
 
 
 Ext.override(Rally.ui.gridboard.GridBoard, {
-    setCurrentView: function(view) {
-
-        this._setSharedViewProperties(this.plugins, view);
-
-        if (view.toggleState === 'grid') {
-            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
-        } else if (view.toggleState === 'board') {
-            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
-        }
-        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
-        this.fireEvent('viewchange', this);
-    }
+//    setCurrentView: function(view) {
+//        
+//        this._setSharedViewProperties(this.plugins, view);
+//
+//        console.log(view);
+//        
+//        if (view.toggleState === 'grid') {
+//            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
+//        } else if (view.toggleState === 'board') {
+//            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
+//        }
+//        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
+//        this.fireEvent('viewchange', this);
+//    }
 });

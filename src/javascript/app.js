@@ -207,6 +207,19 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         });
     },
 
+    _rebuildView: function() {
+        if (this.down('rallygridboard')){
+            this.down('rallygridboard').destroy();
+        }
+
+        var timeboxScope = this.getContext().getTimeboxScope();
+        
+        if(timeboxScope && timeboxScope.getType() === 'iteration') {
+            this.getContext().setTimeboxScope(timeboxScope);
+            this.updateView(timeboxScope);
+        }
+    },
+    
     updateView: function(timeboxScope){
         this.logger.log('updateView');
 
@@ -276,6 +289,8 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
     
     buildBoard: function(store){
 
+        if ( Ext.isEmpty(this.toggleState) ) { this.toggleState = "grid"; }
+        
         var modelNames = this.getModelNames(),
             context = this.getContext(),
             iterationFilters = this.getIterationFilter(),
@@ -287,7 +302,9 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             xtype: 'rallygridboard',
             context: context,
             modelNames: modelNames,
-            toggleState: 'grid',
+            toggleState: this.toggleState,
+            stateful: false,
+            
             plugins: [
                 'rallygridboardaddnew',
                 {
@@ -300,11 +317,11 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                 },
                 {
                     ptype: 'rallygridboardinlinefiltercontrol',
+                    margin: margin,
                     inlineFilterButtonConfig: {
                         stateful: true,
                         stateId: context.getScopedStateId('filters'),
                         modelNames: modelNames,
-                        margin: margin,
                         inlineFilterPanelConfig: {
                             quickFilterPanelConfig: {
                                 defaultFields: [
@@ -356,6 +373,11 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
 
             },
             listeners: {
+                viewchange: function(gb) {
+                    console.log(gb);
+                    this.toggleState = gb.toggleState;
+                    this._rebuildView();
+                },
                 load: this.updateStatsBanner,
                 scope: this
             },

@@ -3,10 +3,10 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Oct 03 2016 19:46:06 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Oct 18 2016 18:34:13 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Oct 03 2016 19:46:06 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Oct 18 2016 18:34:13 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     

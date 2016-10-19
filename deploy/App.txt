@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Oct 03 2016 19:46:05 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Oct 18 2016 18:34:12 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Oct 03 2016 19:46:05 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Oct 18 2016 18:34:12 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 282878971029;
+        var CHECKSUM = 287695417922;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -551,6 +551,22 @@ Ext.override(Rally.ui.cardboard.row.Row,{
         (Rally.util.Ref.isRefUri(rowValue) &&
         Rally.util.Ref.getRelativeUri(recordValue) === Rally.util.Ref.getRelativeUri(rowValue)));
 
+    }
+});
+
+
+Ext.override(Rally.ui.gridboard.GridBoard, {
+    setCurrentView: function(view) {
+
+        this._setSharedViewProperties(this.plugins, view);
+
+        if (view.toggleState === 'grid') {
+            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
+        } else if (view.toggleState === 'board') {
+            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
+        }
+        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
+        this.fireEvent('viewchange', this);
     }
 });
 Ext.define('CArABU.technicalservices.CFDCalculator', {
@@ -3162,7 +3178,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         return this.getNullIterationFilter();
     },
     showBanner: function(){
-        return (this.getSetting('showBanner') === true || this.getSetting('showBanner').toLowerCase() === "true");
+        return (this.getSetting('showBanner') === true || this.getSetting('showBanner') && this.getSetting('showBanner').toLowerCase() === "true");
     },
     getGridBox: function(){
         return this.down('#grid_box');
@@ -3273,7 +3289,8 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
 
         var modelNames = this.getModelNames(),
             context = this.getContext(),
-            iterationFilters = this.getIterationFilter();
+            iterationFilters = this.getIterationFilter(),
+            margin = 3;
         this.logger.log('buildBoard iterationFilters', iterationFilters.toString());
 
         //store.load();
@@ -3307,6 +3324,13 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                     stateId: context.getScopedStateId('columns-example')
                 },
                 'rallygridboardtoggleable',
+                {
+                    ptype: 'rallygridboardsharedviewcontrol',
+                    stateful: true,
+                    stateId: context.getScopedStateId('iteration-view'),
+                    stateEvents: ['select','beforedestroy'],
+                    margin: margin
+                },
                 {
                     ptype: 'rallygridboardactionsmenu',
                     menuItems: [

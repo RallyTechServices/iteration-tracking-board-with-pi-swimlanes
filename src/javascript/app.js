@@ -166,7 +166,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         return this.getNullIterationFilter();
     },
     showBanner: function(){
-        return (this.getSetting('showBanner') === true || this.getSetting('showBanner').toLowerCase() === "true");
+        return (this.getSetting('showBanner') === true || this.getSetting('showBanner') && this.getSetting('showBanner').toLowerCase() === "true");
     },
     getGridBox: function(){
         return this.down('#grid_box');
@@ -277,7 +277,8 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
 
         var modelNames = this.getModelNames(),
             context = this.getContext(),
-            iterationFilters = this.getIterationFilter();
+            iterationFilters = this.getIterationFilter(),
+            margin = 3;
         this.logger.log('buildBoard iterationFilters', iterationFilters.toString());
 
         //store.load();
@@ -311,6 +312,13 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                     stateId: context.getScopedStateId('columns-example')
                 },
                 'rallygridboardtoggleable',
+                {
+                    ptype: 'rallygridboardsharedviewcontrol',
+                    stateful: true,
+                    stateId: context.getScopedStateId('iteration-view'),
+                    stateEvents: ['select','beforedestroy'],
+                    margin: margin
+                },
                 {
                     ptype: 'rallygridboardactionsmenu',
                     menuItems: [

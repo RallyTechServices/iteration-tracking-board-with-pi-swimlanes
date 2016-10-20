@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Oct 18 2016 18:34:12 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Oct 18 2016 21:54:13 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Oct 18 2016 18:34:12 GMT-0600 (MDT)";
-        var BUILDER = "kcorkan";
-        var CHECKSUM = 287695417922;
+        var APP_BUILD_DATE = "Tue Oct 18 2016 21:54:13 GMT-0700 (PDT)";
+        var BUILDER = "jmartin";
+        var CHECKSUM = 292504884469;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -236,9 +236,13 @@ Ext.override(Rally.ui.cardboard.row.Header, {
     }
 });
 
+Ext.override(Rally.ui.gridboard.SharedViewComboBox,{
+
+});
+
+
+
 Ext.override(Rally.ui.cardboard.CardBoard,{
-
-
     _createColumnDefinition: function (columnConfig) {
         var config = Ext.merge({
             enableCrossColumnRanking: this.enableCrossColumnRanking
@@ -361,8 +365,11 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
         return Deft.Promise.when();
     },
 
+    
     _hasValidRowField: function() {
-
+        
+        if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
+        
         var field = this.rowConfig && this.rowConfig.field;
         if (Ext.Array.contains(this.validPortfolioItems, field)){
             return true;
@@ -556,18 +563,20 @@ Ext.override(Rally.ui.cardboard.row.Row,{
 
 
 Ext.override(Rally.ui.gridboard.GridBoard, {
-    setCurrentView: function(view) {
-
-        this._setSharedViewProperties(this.plugins, view);
-
-        if (view.toggleState === 'grid') {
-            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
-        } else if (view.toggleState === 'board') {
-            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
-        }
-        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
-        this.fireEvent('viewchange', this);
-    }
+//    setCurrentView: function(view) {
+//        
+//        this._setSharedViewProperties(this.plugins, view);
+//
+//        console.log(view);
+//        
+//        if (view.toggleState === 'grid') {
+//            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
+//        } else if (view.toggleState === 'board') {
+//            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
+//        }
+//        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
+//        this.fireEvent('viewchange', this);
+//    }
 });
 Ext.define('CArABU.technicalservices.CFDCalculator', {
     extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
@@ -3219,6 +3228,19 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         });
     },
 
+    _rebuildView: function() {
+        if (this.down('rallygridboard')){
+            this.down('rallygridboard').destroy();
+        }
+
+        var timeboxScope = this.getContext().getTimeboxScope();
+        
+        if(timeboxScope && timeboxScope.getType() === 'iteration') {
+            this.getContext().setTimeboxScope(timeboxScope);
+            this.updateView(timeboxScope);
+        }
+    },
+    
     updateView: function(timeboxScope){
         this.logger.log('updateView');
 
@@ -3285,8 +3307,11 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         return boardConfig;
 
     },
+    
     buildBoard: function(store){
 
+        if ( Ext.isEmpty(this.toggleState) ) { this.toggleState = "grid"; }
+        
         var modelNames = this.getModelNames(),
             context = this.getContext(),
             iterationFilters = this.getIterationFilter(),
@@ -3298,10 +3323,22 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             xtype: 'rallygridboard',
             context: context,
             modelNames: modelNames,
-            toggleState: 'grid',
+            toggleState: this.toggleState,
+            stateful: false,
+            
             plugins: [
-                'rallygridboardaddnew',{
+                'rallygridboardaddnew',
+                {
+                    ptype: 'rallygridboardfieldpicker',
+                    headerPosition: 'left',
+                    modelNames: modelNames,
+                    stateful: true,
+                    stateId: context.getScopedStateId('columns-example'),
+                    margin: margin
+                },
+                {
                     ptype: 'rallygridboardinlinefiltercontrol',
+                    margin: margin,
                     inlineFilterButtonConfig: {
                         stateful: true,
                         stateId: context.getScopedStateId('filters'),
@@ -3316,14 +3353,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                             }
                         }
                     }
-                },{
-                    ptype: 'rallygridboardfieldpicker',
-                    headerPosition: 'left',
-                    modelNames: modelNames,
-                    stateful: true,
-                    stateId: context.getScopedStateId('columns-example')
                 },
-                'rallygridboardtoggleable',
                 {
                     ptype: 'rallygridboardsharedviewcontrol',
                     stateful: true,
@@ -3346,7 +3376,8 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
                     buttonConfig: {
                         iconCls: 'icon-export'
                     }
-                }
+                },
+                'rallygridboardtoggleable'
             ],
             cardBoardConfig: this.getCardboardConfig(iterationFilters),
             gridConfig: {
@@ -3363,6 +3394,11 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
 
             },
             listeners: {
+                viewchange: function(gb) {
+                    console.log(gb);
+                    this.toggleState = gb.toggleState;
+                    this._rebuildView();
+                },
                 load: this.updateStatsBanner,
                 scope: this
             },

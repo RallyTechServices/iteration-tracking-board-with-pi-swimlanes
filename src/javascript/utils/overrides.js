@@ -1,6 +1,10 @@
+Ext.override(Rally.ui.gridboard.SharedViewComboBox,{
+
+});
+
+
+
 Ext.override(Rally.ui.cardboard.CardBoard,{
-
-
     _createColumnDefinition: function (columnConfig) {
         var config = Ext.merge({
             enableCrossColumnRanking: this.enableCrossColumnRanking
@@ -123,8 +127,11 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
         return Deft.Promise.when();
     },
 
+    
     _hasValidRowField: function() {
-
+        
+        if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
+        
         var field = this.rowConfig && this.rowConfig.field;
         if (Ext.Array.contains(this.validPortfolioItems, field)){
             return true;
@@ -318,16 +325,18 @@ Ext.override(Rally.ui.cardboard.row.Row,{
 
 
 Ext.override(Rally.ui.gridboard.GridBoard, {
-    setCurrentView: function(view) {
-
-        this._setSharedViewProperties(this.plugins, view);
-
-        if (view.toggleState === 'grid') {
-            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
-        } else if (view.toggleState === 'board') {
-            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
-        }
-        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
-        this.fireEvent('viewchange', this);
-    }
+//    setCurrentView: function(view) {
+//        
+//        this._setSharedViewProperties(this.plugins, view);
+//
+//        console.log(view);
+//        
+//        if (view.toggleState === 'grid') {
+//            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
+//        } else if (view.toggleState === 'board') {
+//            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
+//        }
+//        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
+//        this.fireEvent('viewchange', this);
+//    }
 });

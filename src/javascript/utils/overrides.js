@@ -1,9 +1,3 @@
-Ext.override(Rally.ui.gridboard.SharedViewComboBox,{
-
-});
-
-
-
 Ext.override(Rally.ui.cardboard.CardBoard,{
     _createColumnDefinition: function (columnConfig) {
         var config = Ext.merge({
@@ -54,14 +48,12 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
             Ext.Object.merge(storeConfig, columnConfig.storeConfig);
             storeConfig.filters = Ext.Array.merge(columnConfig.storeConfig.filters || [], this.storeConfig.filters || []);
         }
-        console.log('before storeConfig', storeConfig);
         if (this._hasValidRowField()) {
             storeConfig.sorters = this._getRowSorters(storeConfig.sorters);
             storeConfig.fetch = Ext.Array.merge(this.rowConfig.field, storeConfig.fetch || []);
             config.enableCrossRowDragging = this.rowConfig.enableCrossRowDragging !== false &&
                 !this.rowConfig.fieldDef.readOnly;
         }
-        console.log('storeConfig', storeConfig);
         var sorter = _.last(storeConfig.sorters);
         if(sorter && !Rally.data.Ranker.isRankField(sorter.property)) {
             cardConfig.showRankMenuItems = false;
@@ -108,7 +100,7 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
         return Deft.Promise.when();
     },
     _getPortfolioItemValues: function(portfolioItemName){
-        console.log('not constrained');
+
         var portfolioItemTypePath = "PortfolioItem/" + portfolioItemName;
         return Ext.create('Rally.data.wsapi.Store',{
             model: portfolioItemTypePath,
@@ -118,7 +110,7 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
         }).load({
             callback: function(records, operation){
                 var values = Ext.Array.map(records, function(r){ return r.getData(); });
-                console.log('values', values, operation);
+
                 return {
                     values: values
                 };
@@ -170,7 +162,7 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
 
             this.rowDefinitions = [];
             if(this._hasValidRowField()) {
-                console.log('_rendercolumns', this.rowConfig.values);
+
                 _.each(this.rowConfig.values, function(rowValue) {
                     this._createRow({
                         showHeader: true,
@@ -247,7 +239,6 @@ Ext.override(Rally.ui.cardboard.Column,{
                     storeConfig.filters || [],
                     card.ownerColumn.store.filters.getRange());
                 if(card.ownerColumn.getRows().length > 1) {
-                    console.log('_addColumnFilteres', row, row.fieldDef.Name, row.getRowValue());
                     //Feature
                     //Feature.Parent
                     //Feature.Parent.Parent
@@ -307,7 +298,7 @@ Ext.override(Rally.ui.cardboard.row.Row,{
         if (fieldName === secondLevelPIName){
             var lowestPIName = this.validPortfolioItems[0].replace('PortfolioItem/');
             var lowestPI = record.get(lowestPIName);
-            console.log('lowestPI', lowestPI);
+
             if (lowestPI){
                 recordValue = lowestPI && lowestPI.Parent || "";
             }
@@ -315,7 +306,6 @@ Ext.override(Rally.ui.cardboard.row.Row,{
             recordValue = record.get(fieldName);
         }
 
- //       console.log('isMatchingRecord', record.get('FormattedID'),fieldName, recordValue, rowValue);
         return (rowValue === recordValue ||
         (Rally.util.Ref.isRefUri(rowValue) &&
         Rally.util.Ref.getRelativeUri(recordValue) === Rally.util.Ref.getRelativeUri(rowValue)));
@@ -325,18 +315,25 @@ Ext.override(Rally.ui.cardboard.row.Row,{
 
 
 Ext.override(Rally.ui.gridboard.GridBoard, {
-//    setCurrentView: function(view) {
-//        
-//        this._setSharedViewProperties(this.plugins, view);
-//
-//        console.log(view);
-//        
-//        if (view.toggleState === 'grid') {
-//            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
-//        } else if (view.toggleState === 'board') {
-//            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
-//        }
-//        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
-//        this.fireEvent('viewchange', this);
-//    }
+    _setSharedViewProperties: function (items, view) {
+        //kc - this only works for plugins that have the setCurrentView function.  Those are the filter.
+        // The field picker and toggle plugins do not have this function.
+
+        //need to set the toggle state here since it is not set above
+        this.setToggleState(view.toggleState);
+
+        _.each(items || [], function (p) {
+            if (_.isFunction(p.setCurrentView)) {
+                p.setCurrentView(view);
+            } else {
+
+                if (p.ptype === 'rallygridboardfieldpicker'){
+                    p.updateFields(view.fields);
+                }
+                if (p.ptype === 'rallygridboardsharedviewcontrol'){
+                   //todo, set the view in the dropdown?  
+                }
+            }
+        }, this);
+    }
 });

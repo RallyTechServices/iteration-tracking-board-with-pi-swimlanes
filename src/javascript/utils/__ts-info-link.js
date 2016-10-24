@@ -113,7 +113,7 @@ Ext.define('Rally.technicalservices.InfoLink',{
                     }
                 },
                 failure: function(msg){
-                    console.log("oops:",msg);
+                    Rally.ui.notify.Notifier.showError({message: msg});
                 }
             });
         } else {

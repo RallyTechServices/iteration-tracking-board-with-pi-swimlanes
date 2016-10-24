@@ -374,7 +374,6 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             },
             listeners: {
                 viewchange: function(gb) {
-                    console.log(gb);
                     this.toggleState = gb.toggleState;
                     this._rebuildView();
                 },

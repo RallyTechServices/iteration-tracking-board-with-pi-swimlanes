@@ -33,6 +33,7 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
             ddGroup: this.ddGroup
         });
 
+
         if (this.readOnly) {
             config.dropControllerConfig = false;
         }
@@ -63,27 +64,27 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
     },
 
     _parseRows: function() {
-        if(this.rowConfig) {
-            if (this.rowConfig.field && Ext.Array.contains(this.validPortfolioItems, this.rowConfig.field) && !this.rowConfig.values){
-           // if (this.rowConfig.field && this.rowConfig.field.indexOf('PortfolioItem/') !== -1){
-                    //This is a portfolio item swimlane
-                var fieldName = this.rowConfig.field.replace('PortfolioItem/','');
-                this.rowConfig.fieldDef = this.getModel().getField(fieldName);
-                return this._getPortfolioItemValues(this.rowConfig.field).then({
-                    success: function(swimlaneValues){
-                        if(swimlaneValues){
-                            this.rowConfig.values = swimlaneValues.values;
-                            if(swimlaneValues.sortDirection) {
-                                this.rowConfig.sortDirection = swimlaneValues.sortDirection;
-                            }
-                        }
-                    },
-                    scope: this
-                });
-
-
-            } else {
+       if(this.rowConfig && !this.rowConfig.values) {
+           // if (this.rowConfig.field && Ext.Array.contains(this.validPortfolioItems, this.rowConfig.field) && !this.rowConfig.values){
+           //// if (this.rowConfig.field && this.rowConfig.field.indexOf('PortfolioItem/') !== -1){
+           //    //This is a portfolio item swimlane
+           //     var fieldName = this.rowConfig.field.replace('PortfolioItem/','');
+           //     this.rowConfig.fieldDef = this.getModel().getField(fieldName);
+           //     console.log('fieldName', fieldName);
+           //     return this._getPortfolioItemValues(this.rowConfig.field).then({
+           //         success: function(swimlaneValues){
+           //             if(swimlaneValues){
+           //                 this.rowConfig.values = swimlaneValues.values;
+           //                 if(swimlaneValues.sortDirection) {
+           //                     this.rowConfig.sortDirection = swimlaneValues.sortDirection;
+           //                 }
+           //             }
+           //         },
+           //         scope: this
+           //     });
+           // } else {
                 var fieldDef = this.rowConfig.fieldDef = this.getModel().getField(this.rowConfig.field);
+
                 return this._getAllowedValues(fieldDef).then({
                     success: function(allowedValues){
                         if(allowedValues){
@@ -95,42 +96,43 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
                     },
                     scope: this
                 });
-            }
+            //}
         }
         return Deft.Promise.when();
     },
-    _getPortfolioItemValues: function(portfolioItemName){
-
-        var portfolioItemTypePath = "PortfolioItem/" + portfolioItemName;
-        return Ext.create('Rally.data.wsapi.Store',{
-            model: portfolioItemTypePath,
-            fetch: ['FormattedID','Name','ObjectID'],
-            limit: 'Infinity',
-            context: {project: null}
-        }).load({
-            callback: function(records, operation){
-                var values = Ext.Array.map(records, function(r){ return r.getData(); });
-
-                return {
-                    values: values
-                };
-            }
-        });
-        return Deft.Promise.when();
-    },
+    //_getPortfolioItemValues: function(portfolioItemName){
+    //
+    //    var portfolioItemTypePath = "PortfolioItem/" + portfolioItemName;
+    //    return Ext.create('Rally.data.wsapi.Store',{
+    //        model: portfolioItemTypePath,
+    //        fetch: ['FormattedID','Name','ObjectID'],
+    //        limit: 'Infinity',
+    //        context: {project: null}
+    //    }).load({
+    //        callback: function(records, operation){
+    //            var values = Ext.Array.map(records, function(r){ return r.getData(); });
+    //
+    //            return {
+    //                values: values
+    //            };
+    //        }
+    //    });
+    //    return Deft.Promise.when();
+    //},
 
     
     _hasValidRowField: function() {
-        
-        if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
+
+        //if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
         
         var field = this.rowConfig && this.rowConfig.field;
-        if (Ext.Array.contains(this.validPortfolioItems, field)){
+        if (Ext.Array.contains(this.validPortfolioItems || [], field)){
             return true;
         }
 
-        return this.rowConfig &&
+        var hasValidField = this.rowConfig &&
             _.every(this.getModels(), function(model){ return model.hasField(this.rowConfig.field); }, this);
+        return hasValidField;
     },
     getRowFor: function (item) {
         var rows = this.getRows(),
@@ -162,7 +164,6 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
 
             this.rowDefinitions = [];
             if(this._hasValidRowField()) {
-
                 _.each(this.rowConfig.values, function(rowValue) {
                     this._createRow({
                         showHeader: true,
@@ -294,18 +295,26 @@ Ext.override(Rally.ui.cardboard.row.Row,{
             fieldName = fieldDef && fieldDef.name,
             rowValue = this.getRowValue() || "",
             recordValue ="";
-        var secondLevelPIName = this.validPortfolioItems && this.validPortfolioItems[1].replace('PortfolioItems/');
-        if (fieldName === secondLevelPIName){
-            var lowestPIName = this.validPortfolioItems[0].replace('PortfolioItem/');
-            var lowestPI = record.get(lowestPIName);
 
-            if (lowestPI){
-                recordValue = lowestPI && lowestPI.Parent || "";
-            }
-        } else {
-            recordValue = record.get(fieldName);
+        if (this.getRowValue() === false){
+            rowValue = false;
         }
 
+      //  var secondLevelPIName = this.validPortfolioItems && this.validPortfolioItems[1].replace('PortfolioItem/');
+
+        var idx = _.indexOf(this.validPortfolioItems, fieldName);
+        if (idx > 0){ //(fieldName === secondLevelPIName){
+            var lowestPIName = this.validPortfolioItems[0].replace('PortfolioItem/');
+            var pi = record.get(lowestPIName);
+            if (pi){
+                recordValue = pi && pi.Parent || "";
+            }
+        } else {
+            recordValue = record.get(fieldName) || "";
+            if (fieldDef && Ext.isFunction(fieldDef.getType) && fieldDef.getType() === "boolean"){
+                recordValue = record.get(fieldName) || false ;
+            }
+        }
         return (rowValue === recordValue ||
         (Rally.util.Ref.isRefUri(rowValue) &&
         Rally.util.Ref.getRelativeUri(recordValue) === Rally.util.Ref.getRelativeUri(rowValue)));
@@ -331,7 +340,7 @@ Ext.override(Rally.ui.gridboard.GridBoard, {
                     p.updateFields(view.fields);
                 }
                 if (p.ptype === 'rallygridboardsharedviewcontrol'){
-                   //todo, set the view in the dropdown?  
+                   //todo, set the view in the dropdown?
                 }
             }
         }, this);

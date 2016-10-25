@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Oct 24 2016 11:46:01 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Oct 24 2016 20:29:27 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Oct 24 2016 11:46:01 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Oct 24 2016 20:29:27 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 289736795405;
+        var CHECKSUM = 310140103310;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -207,6 +207,7 @@ Ext.override(Rally.ui.cardboard.row.Header, {
 
     _getTitle: function() {
         var value = this.getValue();
+
         if(Ext.isObject(value)) {
             var objectValue = value._refObjectName;
             if (value.FormattedID) {
@@ -271,6 +272,7 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
             ddGroup: this.ddGroup
         });
 
+
         if (this.readOnly) {
             config.dropControllerConfig = false;
         }
@@ -301,27 +303,27 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
     },
 
     _parseRows: function() {
-        if(this.rowConfig) {
-            if (this.rowConfig.field && Ext.Array.contains(this.validPortfolioItems, this.rowConfig.field) && !this.rowConfig.values){
-           // if (this.rowConfig.field && this.rowConfig.field.indexOf('PortfolioItem/') !== -1){
-                    //This is a portfolio item swimlane
-                var fieldName = this.rowConfig.field.replace('PortfolioItem/','');
-                this.rowConfig.fieldDef = this.getModel().getField(fieldName);
-                return this._getPortfolioItemValues(this.rowConfig.field).then({
-                    success: function(swimlaneValues){
-                        if(swimlaneValues){
-                            this.rowConfig.values = swimlaneValues.values;
-                            if(swimlaneValues.sortDirection) {
-                                this.rowConfig.sortDirection = swimlaneValues.sortDirection;
-                            }
-                        }
-                    },
-                    scope: this
-                });
-
-
-            } else {
+       if(this.rowConfig && !this.rowConfig.values) {
+           // if (this.rowConfig.field && Ext.Array.contains(this.validPortfolioItems, this.rowConfig.field) && !this.rowConfig.values){
+           //// if (this.rowConfig.field && this.rowConfig.field.indexOf('PortfolioItem/') !== -1){
+           //    //This is a portfolio item swimlane
+           //     var fieldName = this.rowConfig.field.replace('PortfolioItem/','');
+           //     this.rowConfig.fieldDef = this.getModel().getField(fieldName);
+           //     console.log('fieldName', fieldName);
+           //     return this._getPortfolioItemValues(this.rowConfig.field).then({
+           //         success: function(swimlaneValues){
+           //             if(swimlaneValues){
+           //                 this.rowConfig.values = swimlaneValues.values;
+           //                 if(swimlaneValues.sortDirection) {
+           //                     this.rowConfig.sortDirection = swimlaneValues.sortDirection;
+           //                 }
+           //             }
+           //         },
+           //         scope: this
+           //     });
+           // } else {
                 var fieldDef = this.rowConfig.fieldDef = this.getModel().getField(this.rowConfig.field);
+
                 return this._getAllowedValues(fieldDef).then({
                     success: function(allowedValues){
                         if(allowedValues){
@@ -333,42 +335,43 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
                     },
                     scope: this
                 });
-            }
+            //}
         }
         return Deft.Promise.when();
     },
-    _getPortfolioItemValues: function(portfolioItemName){
-
-        var portfolioItemTypePath = "PortfolioItem/" + portfolioItemName;
-        return Ext.create('Rally.data.wsapi.Store',{
-            model: portfolioItemTypePath,
-            fetch: ['FormattedID','Name','ObjectID'],
-            limit: 'Infinity',
-            context: {project: null}
-        }).load({
-            callback: function(records, operation){
-                var values = Ext.Array.map(records, function(r){ return r.getData(); });
-
-                return {
-                    values: values
-                };
-            }
-        });
-        return Deft.Promise.when();
-    },
+    //_getPortfolioItemValues: function(portfolioItemName){
+    //
+    //    var portfolioItemTypePath = "PortfolioItem/" + portfolioItemName;
+    //    return Ext.create('Rally.data.wsapi.Store',{
+    //        model: portfolioItemTypePath,
+    //        fetch: ['FormattedID','Name','ObjectID'],
+    //        limit: 'Infinity',
+    //        context: {project: null}
+    //    }).load({
+    //        callback: function(records, operation){
+    //            var values = Ext.Array.map(records, function(r){ return r.getData(); });
+    //
+    //            return {
+    //                values: values
+    //            };
+    //        }
+    //    });
+    //    return Deft.Promise.when();
+    //},
 
     
     _hasValidRowField: function() {
-        
-        if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
+
+        //if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
         
         var field = this.rowConfig && this.rowConfig.field;
-        if (Ext.Array.contains(this.validPortfolioItems, field)){
+        if (Ext.Array.contains(this.validPortfolioItems || [], field)){
             return true;
         }
 
-        return this.rowConfig &&
+        var hasValidField = this.rowConfig &&
             _.every(this.getModels(), function(model){ return model.hasField(this.rowConfig.field); }, this);
+        return hasValidField;
     },
     getRowFor: function (item) {
         var rows = this.getRows(),
@@ -400,7 +403,6 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
 
             this.rowDefinitions = [];
             if(this._hasValidRowField()) {
-
                 _.each(this.rowConfig.values, function(rowValue) {
                     this._createRow({
                         showHeader: true,
@@ -532,18 +534,26 @@ Ext.override(Rally.ui.cardboard.row.Row,{
             fieldName = fieldDef && fieldDef.name,
             rowValue = this.getRowValue() || "",
             recordValue ="";
-        var secondLevelPIName = this.validPortfolioItems && this.validPortfolioItems[1].replace('PortfolioItems/');
-        if (fieldName === secondLevelPIName){
-            var lowestPIName = this.validPortfolioItems[0].replace('PortfolioItem/');
-            var lowestPI = record.get(lowestPIName);
 
-            if (lowestPI){
-                recordValue = lowestPI && lowestPI.Parent || "";
-            }
-        } else {
-            recordValue = record.get(fieldName);
+        if (this.getRowValue() === false){
+            rowValue = false;
         }
 
+      //  var secondLevelPIName = this.validPortfolioItems && this.validPortfolioItems[1].replace('PortfolioItem/');
+
+        var idx = _.indexOf(this.validPortfolioItems, fieldName);
+        if (idx > 0){ //(fieldName === secondLevelPIName){
+            var lowestPIName = this.validPortfolioItems[0].replace('PortfolioItem/');
+            var pi = record.get(lowestPIName);
+            if (pi){
+                recordValue = pi && pi.Parent || "";
+            }
+        } else {
+            recordValue = record.get(fieldName) || "";
+            if (fieldDef && Ext.isFunction(fieldDef.getType) && fieldDef.getType() === "boolean"){
+                recordValue = record.get(fieldName) || false ;
+            }
+        }
         return (rowValue === recordValue ||
         (Rally.util.Ref.isRefUri(rowValue) &&
         Rally.util.Ref.getRelativeUri(recordValue) === Rally.util.Ref.getRelativeUri(rowValue)));
@@ -569,7 +579,7 @@ Ext.override(Rally.ui.gridboard.GridBoard, {
                     p.updateFields(view.fields);
                 }
                 if (p.ptype === 'rallygridboardsharedviewcontrol'){
-                   //todo, set the view in the dropdown?  
+                   //todo, set the view in the dropdown?
                 }
             }
         }, this);
@@ -2280,7 +2290,6 @@ Ext.define('CArABU.technicalservices.Accepted', {
             var iteration = r.get('Iteration'),
                 planEst = r.get('PlanEstimate') || 0;
             //Todo, we are not including dates in the check becausehis is mainly checking to eliminate second class defects.
-            console.log('accepteddate', r.getData(), r.get('AcceptedDate'));
 
             if (planEst && iteration && iteration.Name === name){
                 total += planEst;
@@ -2761,7 +2770,7 @@ Ext.define('CArABU.technicalservices.Tasks', {
     alias:'widget.statsbannertasks',
 
     getRenderData: function() {
-        console.log('this',this.statIcon, this.unitLabel, this.title, this.statUnits);
+
         var activeTasks = 0;
         Ext.Array.each(this.store.getRange(), function(r) {
             var summary = r.get('Summary');
@@ -3056,11 +3065,12 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             success: function(types){
                 this.validPortfolioItems = types;
                 this.logger.log('validPortfolioItems', this.validPortfolioItems);
-                this.initializeData().then({
-                    success: this.onTimeboxScopeChange,
-                    failure: this.showErrorNotification,
-                    scope: this
-                });
+                this.onTimeboxScopeChange();
+                //this.initializeData().then({
+                //    success: this.onTimeboxScopeChange,
+                //    failure: this.showErrorNotification,
+                //    scope: this
+                //});
             },
             failure: this.showErrorNotification,
             scope: this
@@ -3128,7 +3138,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
 
         return _.indexOf(portfolioItems, swimlane);
     },
-    initializeData: function(){
+    initializeData: function(timeboxScope){
         var deferred = Ext.create('Deft.Deferred'),
             portfolioItems = this.getValidPortfolioItemFields(),
             swimlane = this.getSwimlane(),
@@ -3136,35 +3146,104 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
 
         this.logger.log('initializeData', portfolioItems, swimlane,idx );
 
-        if (swimlane && idx){
+        if (swimlane && idx > 0){
+
+            var featureName = portfolioItems[0],
+                filters = timeboxScope && timeboxScope.getQueryFilter();
+
+            filters = filters.and({
+                property: featureName + '.ObjectID',
+                operator: '>',
+                value: 0
+            });
 
             Ext.create('Rally.data.wsapi.Store',{
-                model: 'PortfolioItem/' + portfolioItems[idx],
-                fetch: ['ObjectID','Name','FormattedID','Parent'],
-                filters: [{   //Using Leaf Story count so that we only get portfolio items that have stories associated with them.
-                    property: 'LeafStoryCount',
-                    operator: '>',
-                    value: 0
-                }],
-                compress: false,
-                context: {project: null}
+                model: 'HierarchicalRequirement',
+                fetch: [featureName,'ObjectID'],
+                filters: filters,
+                limit: Infinity
             }).load({
-                callback: function(records, operation){
+                callback: function(records, operation, success){
                     if (operation.wasSuccessful()){
-
-                        var portfolioItemHash = {};
-                        Ext.Array.each(records, function(r){
-                            portfolioItemHash[r.get('ObjectID')] = r.getData();
+                        var features = Ext.Array.map(records, function(r){
+                            return r.get(featureName) && r.get(featureName).ObjectID;
                         });
-                        this.portfolioItemHash = portfolioItemHash;
-                        deferred.resolve();
-                    } else {
-                        deferred.reject("Error loading " + swimlane + ":  " + operation.error && operation.error.errors.join(','));
-                    }
+                        features = Ext.Array.unique(features);
 
+                        var a = [];
+                        for (var i=0; i<idx; i++){
+                            a.push('Children');
+                        }
+                        a.push('ObjectID');
+                        var filterProperty = a.join('.')
+
+                        var filters = Ext.Array.map(features, function(f){
+                            return {
+                                property: filterProperty,
+                                value: f
+                            };
+                        });
+                        if (filters.length > 1){
+                            filters = Rally.data.wsapi.Filter.or(filters);
+                        }
+
+                        Ext.create('Rally.data.wsapi.Store',{
+                            model: 'PortfolioItem/' + portfolioItems[idx],
+                            fetch: ['ObjectID','Name','FormattedID','Parent'],
+                            filters: filters,
+                            compress: false,
+                            context: {project: null}
+                        }).load({
+                            callback: function(records, operation){
+                                if (operation.wasSuccessful()){
+
+                                    var portfolioItemHash = {};
+                                    Ext.Array.each(records, function(r){
+                                        portfolioItemHash[r.get('ObjectID')] = r.getData();
+                                    });
+                                    this.portfolioItemHash = portfolioItemHash;
+                                    deferred.resolve();
+                                } else {
+                                    deferred.reject("Error loading " + swimlane + ":  " + operation.error && operation.error.errors.join(','));
+                                }
+                            },
+                            scope: this
+                        });
+                    } else {
+                        deferred.reject('Failed to load stories associated with iteration:  ' + operation.error.errors.join(','));
+                    }
                 },
                 scope: this
             });
+
+
+            //Ext.create('Rally.data.wsapi.Store',{
+            //    model: 'PortfolioItem/' + portfolioItems[idx],
+            //    fetch: ['ObjectID','Name','FormattedID','Parent'],
+            //    filters: [{   //Using Leaf Story count so that we only get portfolio items that have stories associated with them.
+            //        property: 'LeafStoryCount',
+            //        operator: '>',
+            //        value: 0
+            //    }],
+            //    compress: false,
+            //    context: {project: null}
+            //}).load({
+            //    callback: function(records, operation){
+            //        if (operation.wasSuccessful()){
+            //
+            //            var portfolioItemHash = {};
+            //            Ext.Array.each(records, function(r){
+            //                portfolioItemHash[r.get('ObjectID')] = r.getData();
+            //            });
+            //            this.portfolioItemHash = portfolioItemHash;
+            //            deferred.resolve();
+            //        } else {
+            //            deferred.reject("Error loading " + swimlane + ":  " + operation.error && operation.error.errors.join(','));
+            //        }
+            //
+            //    },
+            //    scope: this
+            //});
         } else {
             deferred.resolve();
         }
@@ -3249,6 +3328,15 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             return;
         }
 
+        this.initializeData(timeboxScope).then({
+            success: this.buildStore,
+            failure: this.showErrorNotification,
+            scope: this
+        });
+
+
+    },
+    buildStore: function(){
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: this.getModelNames(),
             enableHierarchy: true,
@@ -3258,7 +3346,6 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             success: this.buildBoard,
             scope: this
         });
-
     },
     getModelNames: function(){
         return ['userstory','defect','testset','defectsuite'];
@@ -3290,7 +3377,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             if (this.getPortfolioSwimlaneIndex() > 0){
                 values = Ext.Object.getValues(this.portfolioItemHash);
             };
-
+            console.log('values', values,this.getSwimlane(),this.getPortfolioSwimlaneIndex(), this.portfolioItemHash);
             boardConfig.rowConfig = {
                 field: this.getSwimlane(),
                 sortDirection: 'ASC',
@@ -3304,8 +3391,25 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         return boardConfig;
 
     },
-    
+    //updateFeatures: function(store, node, records){
+    //    if (this.getSwimlane() && this.getPortfolioSwimlaneIndex() > 0){
+    //        var featureName = this.getValidPortfolioItemFields()[0],
+    //            portfolioItemHash = this.portfolioItemHash;
+    //
+    //
+    //        Ext.Array.each(records, function(r){
+    //            var feature = r.get(featureName);
+    //            if (feature){
+    //                feature.__ancestor = portfolioItemHash[feature.ObjectID];
+    //                r.set(featureName, feature);
+    //            }
+    //        });
+    //    }
+    //},
     buildBoard: function(store){
+        this.logger.log('buildBoard');
+
+        //store.on('load', this.updateFeatures, this);
 
         if ( Ext.isEmpty(this.toggleState) ) { this.toggleState = "grid"; }
         
@@ -3420,12 +3524,23 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             {name: 'Expedite', value: 'Expedite'}
         ];
 
-        Ext.Array.each(this.validPortfolioItems, function(p){
-            data.push({
-                name: p.DisplayName,
-                value: p.TypePath
-            });
+        data.push({
+            name: this.validPortfolioItems[0].DisplayName,
+            value: this.validPortfolioItems[0].TypePath
         });
+
+        data.push({
+            name: this.validPortfolioItems[1].DisplayName,
+            value: this.validPortfolioItems[1].TypePath
+        });
+
+        //We don't support all levels yet.
+        //Ext.Array.each(this.validPortfolioItems, function(p){
+        //    data.push({
+        //        name: p.DisplayName,
+        //        value: p.TypePath
+        //    });
+        //});
         return data;
     },
     getSettingsFields: function(){

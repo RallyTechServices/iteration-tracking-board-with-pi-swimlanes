@@ -3,7 +3,7 @@ Ext.define('CArABU.technicalservices.Tasks', {
     alias:'widget.statsbannertasks',
 
     getRenderData: function() {
-        console.log('this',this.statIcon, this.unitLabel, this.title, this.statUnits);
+
         var activeTasks = 0;
         Ext.Array.each(this.store.getRange(), function(r) {
             var summary = r.get('Summary');

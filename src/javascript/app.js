@@ -38,11 +38,12 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             success: function(types){
                 this.validPortfolioItems = types;
                 this.logger.log('validPortfolioItems', this.validPortfolioItems);
-                this.initializeData().then({
-                    success: this.onTimeboxScopeChange,
-                    failure: this.showErrorNotification,
-                    scope: this
-                });
+                this.onTimeboxScopeChange();
+                //this.initializeData().then({
+                //    success: this.onTimeboxScopeChange,
+                //    failure: this.showErrorNotification,
+                //    scope: this
+                //});
             },
             failure: this.showErrorNotification,
             scope: this
@@ -110,7 +111,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
 
         return _.indexOf(portfolioItems, swimlane);
     },
-    initializeData: function(){
+    initializeData: function(timeboxScope){
         var deferred = Ext.create('Deft.Deferred'),
             portfolioItems = this.getValidPortfolioItemFields(),
             swimlane = this.getSwimlane(),
@@ -118,35 +119,104 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
 
         this.logger.log('initializeData', portfolioItems, swimlane,idx );
 
-        if (swimlane && idx){
+        if (swimlane && idx > 0){
+
+            var featureName = portfolioItems[0],
+                filters = timeboxScope && timeboxScope.getQueryFilter();
+
+            filters = filters.and({
+                property: featureName + '.ObjectID',
+                operator: '>',
+                value: 0
+            });
 
             Ext.create('Rally.data.wsapi.Store',{
-                model: 'PortfolioItem/' + portfolioItems[idx],
-                fetch: ['ObjectID','Name','FormattedID','Parent'],
-                filters: [{   //Using Leaf Story count so that we only get portfolio items that have stories associated with them.
-                    property: 'LeafStoryCount',
-                    operator: '>',
-                    value: 0
-                }],
-                compress: false,
-                context: {project: null}
+                model: 'HierarchicalRequirement',
+                fetch: [featureName,'ObjectID'],
+                filters: filters,
+                limit: Infinity
             }).load({
-                callback: function(records, operation){
+                callback: function(records, operation, success){
                     if (operation.wasSuccessful()){
-
-                        var portfolioItemHash = {};
-                        Ext.Array.each(records, function(r){
-                            portfolioItemHash[r.get('ObjectID')] = r.getData();
+                        var features = Ext.Array.map(records, function(r){
+                            return r.get(featureName) && r.get(featureName).ObjectID;
                         });
-                        this.portfolioItemHash = portfolioItemHash;
-                        deferred.resolve();
-                    } else {
-                        deferred.reject("Error loading " + swimlane + ":  " + operation.error && operation.error.errors.join(','));
-                    }
+                        features = Ext.Array.unique(features);
 
+                        var a = [];
+                        for (var i=0; i<idx; i++){
+                            a.push('Children');
+                        }
+                        a.push('ObjectID');
+                        var filterProperty = a.join('.')
+
+                        var filters = Ext.Array.map(features, function(f){
+                            return {
+                                property: filterProperty,
+                                value: f
+                            };
+                        });
+                        if (filters.length > 1){
+                            filters = Rally.data.wsapi.Filter.or(filters);
+                        }
+
+                        Ext.create('Rally.data.wsapi.Store',{
+                            model: 'PortfolioItem/' + portfolioItems[idx],
+                            fetch: ['ObjectID','Name','FormattedID','Parent'],
+                            filters: filters,
+                            compress: false,
+                            context: {project: null}
+                        }).load({
+                            callback: function(records, operation){
+                                if (operation.wasSuccessful()){
+
+                                    var portfolioItemHash = {};
+                                    Ext.Array.each(records, function(r){
+                                        portfolioItemHash[r.get('ObjectID')] = r.getData();
+                                    });
+                                    this.portfolioItemHash = portfolioItemHash;
+                                    deferred.resolve();
+                                } else {
+                                    deferred.reject("Error loading " + swimlane + ":  " + operation.error && operation.error.errors.join(','));
+                                }
+                            },
+                            scope: this
+                        });
+                    } else {
+                        deferred.reject('Failed to load stories associated with iteration:  ' + operation.error.errors.join(','));
+                    }
                 },
                 scope: this
             });
+
+
+            //Ext.create('Rally.data.wsapi.Store',{
+            //    model: 'PortfolioItem/' + portfolioItems[idx],
+            //    fetch: ['ObjectID','Name','FormattedID','Parent'],
+            //    filters: [{   //Using Leaf Story count so that we only get portfolio items that have stories associated with them.
+            //        property: 'LeafStoryCount',
+            //        operator: '>',
+            //        value: 0
+            //    }],
+            //    compress: false,
+            //    context: {project: null}
+            //}).load({
+            //    callback: function(records, operation){
+            //        if (operation.wasSuccessful()){
+            //
+            //            var portfolioItemHash = {};
+            //            Ext.Array.each(records, function(r){
+            //                portfolioItemHash[r.get('ObjectID')] = r.getData();
+            //            });
+            //            this.portfolioItemHash = portfolioItemHash;
+            //            deferred.resolve();
+            //        } else {
+            //            deferred.reject("Error loading " + swimlane + ":  " + operation.error && operation.error.errors.join(','));
+            //        }
+            //
+            //    },
+            //    scope: this
+            //});
         } else {
             deferred.resolve();
         }
@@ -231,6 +301,15 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             return;
         }
 
+        this.initializeData(timeboxScope).then({
+            success: this.buildStore,
+            failure: this.showErrorNotification,
+            scope: this
+        });
+
+
+    },
+    buildStore: function(){
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: this.getModelNames(),
             enableHierarchy: true,
@@ -240,7 +319,6 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             success: this.buildBoard,
             scope: this
         });
-
     },
     getModelNames: function(){
         return ['userstory','defect','testset','defectsuite'];
@@ -272,7 +350,7 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             if (this.getPortfolioSwimlaneIndex() > 0){
                 values = Ext.Object.getValues(this.portfolioItemHash);
             };
-
+            console.log('values', values,this.getSwimlane(),this.getPortfolioSwimlaneIndex(), this.portfolioItemHash);
             boardConfig.rowConfig = {
                 field: this.getSwimlane(),
                 sortDirection: 'ASC',
@@ -286,8 +364,25 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
         return boardConfig;
 
     },
-    
+    //updateFeatures: function(store, node, records){
+    //    if (this.getSwimlane() && this.getPortfolioSwimlaneIndex() > 0){
+    //        var featureName = this.getValidPortfolioItemFields()[0],
+    //            portfolioItemHash = this.portfolioItemHash;
+    //
+    //
+    //        Ext.Array.each(records, function(r){
+    //            var feature = r.get(featureName);
+    //            if (feature){
+    //                feature.__ancestor = portfolioItemHash[feature.ObjectID];
+    //                r.set(featureName, feature);
+    //            }
+    //        });
+    //    }
+    //},
     buildBoard: function(store){
+        this.logger.log('buildBoard');
+
+        //store.on('load', this.updateFeatures, this);
 
         if ( Ext.isEmpty(this.toggleState) ) { this.toggleState = "grid"; }
         
@@ -402,12 +497,23 @@ Ext.define("iteration-tracking-board-with-pi-swimlanes", {
             {name: 'Expedite', value: 'Expedite'}
         ];
 
-        Ext.Array.each(this.validPortfolioItems, function(p){
-            data.push({
-                name: p.DisplayName,
-                value: p.TypePath
-            });
+        data.push({
+            name: this.validPortfolioItems[0].DisplayName,
+            value: this.validPortfolioItems[0].TypePath
         });
+
+        data.push({
+            name: this.validPortfolioItems[1].DisplayName,
+            value: this.validPortfolioItems[1].TypePath
+        });
+
+        //We don't support all levels yet.
+        //Ext.Array.each(this.validPortfolioItems, function(p){
+        //    data.push({
+        //        name: p.DisplayName,
+        //        value: p.TypePath
+        //    });
+        //});
         return data;
     },
     getSettingsFields: function(){

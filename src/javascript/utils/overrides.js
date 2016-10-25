@@ -1,9 +1,3 @@
-Ext.override(Rally.ui.gridboard.SharedViewComboBox,{
-
-});
-
-
-
 Ext.override(Rally.ui.cardboard.CardBoard,{
     _createColumnDefinition: function (columnConfig) {
         var config = Ext.merge({
@@ -39,6 +33,7 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
             ddGroup: this.ddGroup
         });
 
+
         if (this.readOnly) {
             config.dropControllerConfig = false;
         }
@@ -54,14 +49,12 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
             Ext.Object.merge(storeConfig, columnConfig.storeConfig);
             storeConfig.filters = Ext.Array.merge(columnConfig.storeConfig.filters || [], this.storeConfig.filters || []);
         }
-        console.log('before storeConfig', storeConfig);
         if (this._hasValidRowField()) {
             storeConfig.sorters = this._getRowSorters(storeConfig.sorters);
             storeConfig.fetch = Ext.Array.merge(this.rowConfig.field, storeConfig.fetch || []);
             config.enableCrossRowDragging = this.rowConfig.enableCrossRowDragging !== false &&
                 !this.rowConfig.fieldDef.readOnly;
         }
-        console.log('storeConfig', storeConfig);
         var sorter = _.last(storeConfig.sorters);
         if(sorter && !Rally.data.Ranker.isRankField(sorter.property)) {
             cardConfig.showRankMenuItems = false;
@@ -71,27 +64,27 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
     },
 
     _parseRows: function() {
-        if(this.rowConfig) {
-            if (this.rowConfig.field && Ext.Array.contains(this.validPortfolioItems, this.rowConfig.field) && !this.rowConfig.values){
-           // if (this.rowConfig.field && this.rowConfig.field.indexOf('PortfolioItem/') !== -1){
-                    //This is a portfolio item swimlane
-                var fieldName = this.rowConfig.field.replace('PortfolioItem/','');
-                this.rowConfig.fieldDef = this.getModel().getField(fieldName);
-                return this._getPortfolioItemValues(this.rowConfig.field).then({
-                    success: function(swimlaneValues){
-                        if(swimlaneValues){
-                            this.rowConfig.values = swimlaneValues.values;
-                            if(swimlaneValues.sortDirection) {
-                                this.rowConfig.sortDirection = swimlaneValues.sortDirection;
-                            }
-                        }
-                    },
-                    scope: this
-                });
-
-
-            } else {
+       if(this.rowConfig && !this.rowConfig.values) {
+           // if (this.rowConfig.field && Ext.Array.contains(this.validPortfolioItems, this.rowConfig.field) && !this.rowConfig.values){
+           //// if (this.rowConfig.field && this.rowConfig.field.indexOf('PortfolioItem/') !== -1){
+           //    //This is a portfolio item swimlane
+           //     var fieldName = this.rowConfig.field.replace('PortfolioItem/','');
+           //     this.rowConfig.fieldDef = this.getModel().getField(fieldName);
+           //     console.log('fieldName', fieldName);
+           //     return this._getPortfolioItemValues(this.rowConfig.field).then({
+           //         success: function(swimlaneValues){
+           //             if(swimlaneValues){
+           //                 this.rowConfig.values = swimlaneValues.values;
+           //                 if(swimlaneValues.sortDirection) {
+           //                     this.rowConfig.sortDirection = swimlaneValues.sortDirection;
+           //                 }
+           //             }
+           //         },
+           //         scope: this
+           //     });
+           // } else {
                 var fieldDef = this.rowConfig.fieldDef = this.getModel().getField(this.rowConfig.field);
+
                 return this._getAllowedValues(fieldDef).then({
                     success: function(allowedValues){
                         if(allowedValues){
@@ -103,42 +96,43 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
                     },
                     scope: this
                 });
-            }
+            //}
         }
         return Deft.Promise.when();
     },
-    _getPortfolioItemValues: function(portfolioItemName){
-        console.log('not constrained');
-        var portfolioItemTypePath = "PortfolioItem/" + portfolioItemName;
-        return Ext.create('Rally.data.wsapi.Store',{
-            model: portfolioItemTypePath,
-            fetch: ['FormattedID','Name','ObjectID'],
-            limit: 'Infinity',
-            context: {project: null}
-        }).load({
-            callback: function(records, operation){
-                var values = Ext.Array.map(records, function(r){ return r.getData(); });
-                console.log('values', values, operation);
-                return {
-                    values: values
-                };
-            }
-        });
-        return Deft.Promise.when();
-    },
+    //_getPortfolioItemValues: function(portfolioItemName){
+    //
+    //    var portfolioItemTypePath = "PortfolioItem/" + portfolioItemName;
+    //    return Ext.create('Rally.data.wsapi.Store',{
+    //        model: portfolioItemTypePath,
+    //        fetch: ['FormattedID','Name','ObjectID'],
+    //        limit: 'Infinity',
+    //        context: {project: null}
+    //    }).load({
+    //        callback: function(records, operation){
+    //            var values = Ext.Array.map(records, function(r){ return r.getData(); });
+    //
+    //            return {
+    //                values: values
+    //            };
+    //        }
+    //    });
+    //    return Deft.Promise.when();
+    //},
 
     
     _hasValidRowField: function() {
-        
-        if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
+
+        //if ( Ext.isEmpty(this.validPortfolioItems) ) { return false; }
         
         var field = this.rowConfig && this.rowConfig.field;
-        if (Ext.Array.contains(this.validPortfolioItems, field)){
+        if (Ext.Array.contains(this.validPortfolioItems || [], field)){
             return true;
         }
 
-        return this.rowConfig &&
+        var hasValidField = this.rowConfig &&
             _.every(this.getModels(), function(model){ return model.hasField(this.rowConfig.field); }, this);
+        return hasValidField;
     },
     getRowFor: function (item) {
         var rows = this.getRows(),
@@ -170,7 +164,6 @@ Ext.override(Rally.ui.cardboard.CardBoard,{
 
             this.rowDefinitions = [];
             if(this._hasValidRowField()) {
-                console.log('_rendercolumns', this.rowConfig.values);
                 _.each(this.rowConfig.values, function(rowValue) {
                     this._createRow({
                         showHeader: true,
@@ -247,7 +240,6 @@ Ext.override(Rally.ui.cardboard.Column,{
                     storeConfig.filters || [],
                     card.ownerColumn.store.filters.getRange());
                 if(card.ownerColumn.getRows().length > 1) {
-                    console.log('_addColumnFilteres', row, row.fieldDef.Name, row.getRowValue());
                     //Feature
                     //Feature.Parent
                     //Feature.Parent.Parent
@@ -303,19 +295,26 @@ Ext.override(Rally.ui.cardboard.row.Row,{
             fieldName = fieldDef && fieldDef.name,
             rowValue = this.getRowValue() || "",
             recordValue ="";
-        var secondLevelPIName = this.validPortfolioItems && this.validPortfolioItems[1].replace('PortfolioItems/');
-        if (fieldName === secondLevelPIName){
-            var lowestPIName = this.validPortfolioItems[0].replace('PortfolioItem/');
-            var lowestPI = record.get(lowestPIName);
-            console.log('lowestPI', lowestPI);
-            if (lowestPI){
-                recordValue = lowestPI && lowestPI.Parent || "";
-            }
-        } else {
-            recordValue = record.get(fieldName);
+
+        if (this.getRowValue() === false){
+            rowValue = false;
         }
 
- //       console.log('isMatchingRecord', record.get('FormattedID'),fieldName, recordValue, rowValue);
+      //  var secondLevelPIName = this.validPortfolioItems && this.validPortfolioItems[1].replace('PortfolioItem/');
+
+        var idx = _.indexOf(this.validPortfolioItems, fieldName);
+        if (idx > 0){ //(fieldName === secondLevelPIName){
+            var lowestPIName = this.validPortfolioItems[0].replace('PortfolioItem/');
+            var pi = record.get(lowestPIName);
+            if (pi){
+                recordValue = pi && pi.Parent || "";
+            }
+        } else {
+            recordValue = record.get(fieldName) || "";
+            if (fieldDef && Ext.isFunction(fieldDef.getType) && fieldDef.getType() === "boolean"){
+                recordValue = record.get(fieldName) || false ;
+            }
+        }
         return (rowValue === recordValue ||
         (Rally.util.Ref.isRefUri(rowValue) &&
         Rally.util.Ref.getRelativeUri(recordValue) === Rally.util.Ref.getRelativeUri(rowValue)));
@@ -325,18 +324,25 @@ Ext.override(Rally.ui.cardboard.row.Row,{
 
 
 Ext.override(Rally.ui.gridboard.GridBoard, {
-//    setCurrentView: function(view) {
-//        
-//        this._setSharedViewProperties(this.plugins, view);
-//
-//        console.log(view);
-//        
-//        if (view.toggleState === 'grid') {
-//            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
-//        } else if (view.toggleState === 'board') {
-//            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
-//        }
-//        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
-//        this.fireEvent('viewchange', this);
-//    }
+    _setSharedViewProperties: function (items, view) {
+        //kc - this only works for plugins that have the setCurrentView function.  Those are the filter.
+        // The field picker and toggle plugins do not have this function.
+
+        //need to set the toggle state here since it is not set above
+        this.setToggleState(view.toggleState);
+
+        _.each(items || [], function (p) {
+            if (_.isFunction(p.setCurrentView)) {
+                p.setCurrentView(view);
+            } else {
+
+                if (p.ptype === 'rallygridboardfieldpicker'){
+                    p.updateFields(view.fields);
+                }
+                if (p.ptype === 'rallygridboardsharedviewcontrol'){
+                   //todo, set the view in the dropdown?
+                }
+            }
+        }, this);
+    }
 });

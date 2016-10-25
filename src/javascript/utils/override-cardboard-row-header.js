@@ -2,6 +2,7 @@ Ext.override(Rally.ui.cardboard.row.Header, {
 
     _getTitle: function() {
         var value = this.getValue();
+
         if(Ext.isObject(value)) {
             var objectValue = value._refObjectName;
             if (value.FormattedID) {

@@ -346,3 +346,15 @@ Ext.override(Rally.ui.gridboard.GridBoard, {
         }, this);
     }
 });
+
+
+Ext.override(Rally.ui.gridboard.SharedViewComboBox,{
+
+    _isViewPreference: function(record){
+        // record coming back from dialog has a number for AppId, but this.getContext is a string
+        return record.self.typePath === 'preference' &&
+            record.get('Type') === 'View' &&
+            "" + record.get('AppId') === "" + this.getContext().getAppId();
+    }
+
+});

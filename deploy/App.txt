@@ -3,12 +3,12 @@
 <head>
     <title>Iteration Tracking Board with PI Swimlanes</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Oct 24 2016 20:29:27 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Nov 21 2016 11:02:22 GMT-0800 (PST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Oct 24 2016 20:29:27 GMT-0600 (MDT)";
-        var BUILDER = "kcorkan";
-        var CHECKSUM = 310140103310;
+        var APP_BUILD_DATE = "Mon Nov 21 2016 11:02:22 GMT-0800 (PST)";
+        var BUILDER = "jmartin";
+        var CHECKSUM = 312398816944;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -584,6 +584,18 @@ Ext.override(Rally.ui.gridboard.GridBoard, {
             }
         }, this);
     }
+});
+
+
+Ext.override(Rally.ui.gridboard.SharedViewComboBox,{
+
+    _isViewPreference: function(record){
+        // record coming back from dialog has a number for AppId, but this.getContext is a string
+        return record.self.typePath === 'preference' &&
+            record.get('Type') === 'View' &&
+            "" + record.get('AppId') === "" + this.getContext().getAppId();
+    }
+
 });
 Ext.define('CArABU.technicalservices.CFDCalculator', {
     extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
